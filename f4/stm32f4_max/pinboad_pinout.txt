@@ -1,0 +1,7 @@
+PE13 -> S1 -> GND
+PE12 -> S2 -> GND
+PE14 -> S3 -> GND
+PE15 -> S4 -> GND
+
+PA4 -> DAC_OUT1
+PA5 -> DAC_OUT2

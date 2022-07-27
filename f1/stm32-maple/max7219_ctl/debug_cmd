@@ -1,0 +1,5 @@
+target remote localhost:4242
+file max7219_ctl.elf
+load
+break main
+continue

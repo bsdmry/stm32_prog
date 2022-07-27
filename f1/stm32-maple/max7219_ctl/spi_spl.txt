@@ -1,0 +1,44 @@
+=======================SSI===========================================================
+void SPI_NSSInternalSoftwareConfig(SPI_TypeDef* SPIx, uint16_t SPI_NSSInternalSoft)
+ {
+   /* Check the parameters */
+   assert_param(IS_SPI_ALL_PERIPH(SPIx));
+   assert_param(IS_SPI_NSS_INTERNAL(SPI_NSSInternalSoft));
+   if (SPI_NSSInternalSoft != SPI_NSSInternalSoft_Reset)
+   {
+     /* Set NSS pin internally by software */
+     SPIx->CR1 |= SPI_NSSInternalSoft_Set; 0x0100
+   }
+   else
+   {
+     /* Reset NSS pin internally by software */
+     SPIx->CR1 &= SPI_NSSInternalSoft_Reset; 0xFEFF
+   }
+}
+==================================================================================
+
+#########################SSOE=======================================
+void SPI_SSOutputCmd(SPI_TypeDef* SPIx, FunctionalState NewState)
+ {
+   /* Check the parameters */
+   assert_param(IS_SPI_ALL_PERIPH(SPIx));
+   assert_param(IS_FUNCTIONAL_STATE(NewState));
+   if (NewState != DISABLE)
+   {
+     /* Enable the selected SPI SS output */
+     SPIx->CR2 |= CR2_SSOE_Set; 0x0004
+   }
+   else
+   {
+     /* Disable the selected SPI SS output */
+     SPIx->CR2 &= CR2_SSOE_Reset; 0xFFFB
+   }
+ }
+#######################################################################
+
+SPI_InitStructure.SPI_NSS =SPI_NSS_Hard; // 
+	SPIx->CR1 &= CR1_CLEAR_Mask 
+	SPIx->CR1 |= 0x0000
+SPI_InitStructure.SPI_NSS =SPI_NSS_Soft; // 0x0200
+	SPIx->CR1 &= CR1_CLEAR_Mask 
+	SPIx->CR1 |= 0x0200

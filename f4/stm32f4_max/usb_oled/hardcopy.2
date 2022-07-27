@@ -1,0 +1,42 @@
+void timer_regular_setup(void){                                                               |    sCnt[0] = (uint8_t)((enCnt / 1000000000) + 0x30);
+    //gpio_mode_setup(GPIOE, GPIO_MODE_OUTPUT, GPIO_PUPD_NONE, GPIO8); //DBG PIN              |    sCnt[1] = (uint8_t)(((enCnt / 99999999)%10) + 0x30);
+    //gpio_set(GPIOE, GPIO8);                                                                 |    sCnt[2] = (uint8_t)(((enCnt / 10000000)%10) + 0x30);
+    /* Reset TIM2 peripheral to defaults. */                                                  |    sCnt[3] = (uint8_t)(((enCnt / 1000000)%10) + 0x30);
+    rcc_periph_reset_pulse(RST_TIM7);                                                         |    sCnt[4] = (uint8_t)(((enCnt / 100000)%10) + 0x30);
+    /*                                                                                        |    sCnt[5] = (uint8_t)(((enCnt / 10000)%10) + 0x30);
+     * Please take note that the clock source for STM32 timers                                |    sCnt[6] = (uint8_t)(((enCnt / 1000)%10) + 0x30);
+     * might not be the raw APB1/APB2 clocks.  In various conditions they                     |    sCnt[7] = (uint8_t)(((enCnt / 100)%10) + 0x30);
+     * are doubled.  See the Reference Manual for full details!                               |    sCnt[8] = (uint8_t)(((enCnt / 10)%10) + 0x30);
+     * In our case, TIM2 on APB1 is running at double frequency, so this                      |    sCnt[9] = (uint8_t)((enCnt%10) + 0x30);
+     * sets the prescaler to have the timer run at 5kHz                                       |    lcd1602_gpio_print(sCnt, 10, LCD1602_LINE_2);
+     */                                                                                       |}
+    timer_set_prescaler(TIM7, 8399);                                                          |
+    timer_set_period(TIM7, 100); //~10.1ms                                                    |int main(void)
+    /* Enable TIM2 interrupt. */                                                              |{
+    nvic_set_priority(NVIC_TIM7_IRQ, 14);                                                     |    clock_setup();
+    nvic_enable_irq(NVIC_TIM7_IRQ);                                                           |    usart_init();
+    timer_enable_update_event(TIM7);                                                          |    lcd1602_gpio_init();
+    timer_enable_irq(TIM7, TIM_DIER_UIE);                                                     |    timer_regular_init();
+    timer_enable_counter(TIM7);                                                               |    rotary_encoder_gpio_init();
+timer_regular.c                                                             31,4           48%|    print_frequency();
+                                                                                              |    usartWriteString((uint8_t *)"Hz opencm2!", 11);
+uint32_t rotary_encoder_gpio_get_value(void){                                                 |    uint8_t scr_div = 0;
+    return rotary_encoder_value;                                                              |    rcc_periph_clock_enable(RCC_GPIOE); //DBG PIN
+}                                                                                             |    gpio_mode_setup(GPIOE, GPIO_MODE_OUTPUT, GPIO_PUPD_NONE, GP
+                                                                                              |IO8 | GPIO9, GPIO10); //DBG PIN
+void tim3_isr(void)                                                                           |    while (1) {
+{                                                                                             |        if (timer_regular_irq){
+        timer_clear_flag(TIM3, TIM_SR_UIF);                                                   |            timer_regular_irq = 0;
+        gpio_toggle(GPIOE, GPIO8);                                                            |            enCnt = rotary_encoder_get_value();
+        uint8_t i =(uint8_t)gpio_get(GPIOC, GPIO6);                                           |            if (scr_div >= 10){
+        uint8_t q =(uint8_t)gpio_get(GPIOC, GPIO7);                                           |                print_cnt();
+        uint8_t fsm_new_state = ((i << 1) | q );                                              |                scr_div = 0;
+        switch (fsm_old_state){                                                               |            } else {
+            case 2: {                                                                         |                scr_div++;
+                if (fsm_new_state == 3) {                                                     |            }
+                    rotary_encoder_value++;                                                   |        }
+                    rotary_step_up = 1;                                                       |        __asm__("NOP");
+                    rotary_step_down = 0;                                                     |    }
+                }                                                                             |
+rotary.c                                                                    73,4           56% pcr_ctl.c                                    71,82          95%
+"pcr_ctl.c" 87L, 2859C 70?8A0=>

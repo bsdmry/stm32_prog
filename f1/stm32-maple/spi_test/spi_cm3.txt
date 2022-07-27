@@ -1,0 +1,50 @@
+===========================SSI=============================
+
+
+
+void spi_set_nss_high(uint32_t spi)
+ {
+         SPI_CR1(spi) |= SPI_CR1_SSI; 0x0100
+ }
+
+
+
+  void spi_set_nss_low(uint32_t spi)
+ {
+         SPI_CR1(spi) &= ~SPI_CR1_SSI; 0x0100
+ }
+
+
+============================================================  
+
+============================SSOE==============================
+
+
+
+ void spi_enable_ss_output(uint32_t spi)
+ {
+         SPI_CR2(spi) |= SPI_CR2_SSOE;	
+ }
+
+ void spi_disable_ss_output(uint32_t spi)
+ {
+         SPI_CR2(spi) &= ~SPI_CR2_SSOE;
+ }
+
+
+
+
+=============================================================
+
+========================SSM=================================
+ void spi_enable_software_slave_management(uint32_t spi)
+ {
+         SPI_CR1(spi) |= SPI_CR1_SSM; 0x0200
+         /* allow slave select to be an input */
+         SPI_CR2(spi) &= ~SPI_CR2_SSOE;
+ }
+  void spi_disable_software_slave_management(uint32_t spi)
+ {
+         SPI_CR1(spi) &= ~SPI_CR1_SSM; 0x0200
+ }
+===========================================================
