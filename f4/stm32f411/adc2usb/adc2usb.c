@@ -38,6 +38,12 @@ uint8_t usbd_control_buffer[128];
 uint16_t adc_buffer0[ADC_BUFFER_LENGTH];
 uint16_t adc_buffer1[ADC_BUFFER_LENGTH];
 int16_t adc2ep[ADC2EP_BUFFER_LENGTH] = {5000};
+int16_t waveform_data[32] = {
+	0,  32767,  12539,  30272,  23169,  23169,  30272,  12539,
+        32767, 0,  30272, -12539,  23169, -23169,  12539, -30272,
+        0, -32767, -12539, -30272, -23169, -23169, -30272, -12539,
+       -32767, 0, -30272,  12539, -23169,  23169, -12539,  30272 
+};
 
 
 static const struct usb_device_descriptor dev = {
@@ -182,12 +188,13 @@ void dma2_stream0_isr(void)
 		}
 		int32_t temp = 0;
 		for (uint16_t i = 0; i < ADC_BUFFER_LENGTH; i++){
-			temp = (int32_t)(b[i] - 32768);
-			//temp = (int32_t)(b[i] - 16384);
-			buf_push(&ring_buffer, (int16_t)temp);
+			//temp = (int32_t)(b[i] - 32768);
+			temp = (int32_t)(b[i] - 16384);
+			buf_push_s16(&ring_buffer, (int16_t)temp);
 		}
 		
 		adc_buffer_pointer = ~adc_buffer_pointer;
+		//adc_buffer_pointer = adc_buffer_pointer ^ 0x1;
 		dma_clear_interrupt_flags(DMA2, DMA_STREAM0, DMA_TCIF);
 	}
 }
@@ -214,14 +221,16 @@ void endpoint_callback(usbd_device *usbd_dev, uint8_t ep)
 {
     toggle_isochronous_frame(ep);
     usbd_ep_write_packet(usbd_dev, 0x82, adc2ep, ADC2EP_BUFFER_LENGTH*2);
+    //usbd_ep_write_packet(usbd_dev, 0x82, waveform_data, ADC2EP_BUFFER_LENGTH*2);
 }
 
 void usbaudio_set_config(usbd_device *usbd_dev, uint16_t wValue)
 {
     (void)wValue;
-	//16 kHz per ch * 2 ch * 2 bytes (int16_t) / 1000 (1ms) = 64 bytes
+	//16 kHz per ch * 2 ch * 2 bytes (int16_t) / 1000 (1ms) = 64 bytes BYTES!!! Not int16 chunks!
     usbd_ep_setup(usbd_dev, 0x82, USB_ENDPOINT_ATTR_ISOCHRONOUS, ADC2EP_BUFFER_LENGTH*2, endpoint_callback);
     usbd_ep_write_packet(usbd_dev, 0x82, adc2ep, ADC2EP_BUFFER_LENGTH*2);
+    //usbd_ep_write_packet(usbd_dev, 0x82, waveform_data, ADC2EP_BUFFER_LENGTH*2);
 }
 
 int main(void)
@@ -235,9 +244,9 @@ int main(void)
 	gpio_set(GPIOC, GPIO13);
 	while(1){
 		if (ring_buffer.length >= 128){
-		gpio_clear(GPIOC, GPIO13);
+			gpio_clear(GPIOC, GPIO13);
 			for (uint16_t i = 0; i < ADC2EP_BUFFER_LENGTH; i++){
-				buf_pop(&ring_buffer, &adc2ep[i]);
+				buf_pop_s16(&ring_buffer, &adc2ep[i]);
 			}
 		}
 	}

@@ -5,7 +5,7 @@ typedef struct {
     int16_t * const buffer;
     uint16_t head;
     uint16_t tail;
-    uint16_t length;
+    volatile uint16_t length;
     const uint16_t maxindex;
 } cbuf_s16;
 
@@ -13,7 +13,7 @@ typedef struct {
     uint16_t * const buffer;
     uint16_t head;
     uint16_t tail;
-    uint16_t length;
+    volatile uint16_t length;
     const uint16_t maxindex;
 } cbuf_u16;
 
@@ -21,7 +21,7 @@ typedef struct {
     uint8_t * const buffer;
     uint16_t head;
     uint16_t tail;
-    uint16_t length;
+    volatile uint16_t length;
     const uint16_t maxindex;
 } cbuf_u8;
 
