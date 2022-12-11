@@ -1,5 +1,9 @@
 #include "si5351.h"
-#include "../../dev_lib/i2c.h"
+#include "i2c.h"
+
+//LibOpenCM3 version of https://github.com/afiskon/stm32-si5351/blob/main/si5351/si5351.c
+uint32_t si5351Correction;
+
 void si5351_calculate_params(int32_t Fclk, si5351_pll_cfg* pll_conf, si5351_out_conf* out_conf) {
     if(Fclk < 1000000) {
         Fclk *= 64;
@@ -105,7 +109,7 @@ void si5351_setup_pll(uint32_t i2c, si5351_pll_t pll, si5351_pll_cfg* conf) {
     i2c_write_reg_single(i2c, SI5351_ADDRESS, SI5351_REGISTER_177_PLL_RESET, (1<<7) | (1<<5) );
 }
 
-int si5351_setp_output(
+int si5351_setup_output(
 		uint32_t i2c,
 		uint8_t output, 
 		si5351_pll_t pllSource, 
@@ -185,7 +189,7 @@ void si5351_setup_clk0(uint32_t i2c, int32_t Fclk, si5351_drv_strength_t driveSt
 
 	si5351_calculate_params(Fclk, &pll_conf, &out_conf);
 	si5351_setup_pll(i2c, SI5351_PLL_A, &pll_conf);
-	si5351_setp_output(i2c, 0, SI5351_PLL_A, driveStrength, &out_conf, 0);
+	si5351_setup_output(i2c, 0, SI5351_PLL_A, driveStrength, &out_conf, 0);
 }
 void si5351_setup_clk2(uint32_t i2c, int32_t Fclk, si5351_drv_strength_t driveStrength) {
 	si5351_pll_cfg pll_conf;
@@ -193,10 +197,10 @@ void si5351_setup_clk2(uint32_t i2c, int32_t Fclk, si5351_drv_strength_t driveSt
 
 	si5351_calculate_params(Fclk, &pll_conf, &out_conf);
 	si5351_setup_pll(i2c, SI5351_PLL_B, &pll_conf);
-	si5351_setp_output(i2c, 2, SI5351_PLL_B, driveStrength, &out_conf, 0);
+	si5351_setup_output(i2c, 2, SI5351_PLL_B, driveStrength, &out_conf, 0);
 }
 
-void si5351_enable_outputs(uint8_t enabled) {
+void si5351_enable_outputs(uint32_t i2c, uint8_t enabled) {
     i2c_write_reg_single(i2c, SI5351_ADDRESS, SI5351_REGISTER_3_OUTPUT_ENABLE_CONTROL, ~enabled);
 }
 

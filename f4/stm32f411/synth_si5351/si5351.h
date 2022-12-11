@@ -1,3 +1,7 @@
+#ifndef H_SI5351
+#define H_SI5351
+#include <stdint.h>
+#include <inttypes.h>
 #define SI5351_ADDRESS 0x60
 
 enum {
@@ -101,6 +105,18 @@ typedef enum {
 } si5351_rdiv_t;
 
 typedef enum {
+   SI5351_OUT_CLK_0 = 1,
+   SI5351_OUT_CLK_1 = 2,
+   SI5351_OUT_CLK_2 = 4,
+   SI5351_OUT_CLK_3 = 8,
+   SI5351_OUT_CLK_4 = 16,
+   SI5351_OUT_CLK_5 = 32,
+   SI5351_OUT_CLK_6 = 64,
+   SI5351_OUT_CLK_7 = 128,
+
+} si5351_out_t;
+
+typedef enum {
     SI5351_DRIVE_STRENGTH_2MA = 0x00, //  ~ 2.2 dBm
     SI5351_DRIVE_STRENGTH_4MA = 0x01, //  ~ 7.5 dBm
     SI5351_DRIVE_STRENGTH_6MA = 0x02, //  ~ 9.5 dBm
@@ -118,14 +134,16 @@ typedef struct {
 	int32_t div;
 	si5351_rdiv_t rdiv;
 	int32_t num;
-	int32_t denum;
+	int32_t denom;
 } si5351_out_conf;
 
 void si5351_calculate_params(int32_t Fclk, si5351_pll_cfg* pll_conf, si5351_out_conf* out_conf);
 void si5351_init(uint32_t i2c, int32_t correction);
 void si5351_setup_pll(uint32_t i2c, si5351_pll_t pll, si5351_pll_cfg* conf);
-int si5351_setp_output( uint32_t i2c, uint8_t output, si5351_pll_t pllSource, si5351_drv_strength_t driveStrength, si5351_out_conf* conf, uint8_t phaseOffset);
+int si5351_setup_output( uint32_t i2c, uint8_t output, si5351_pll_t pllSource, si5351_drv_strength_t driveStrength, si5351_out_conf* conf, uint8_t phaseOffset);
 void si5351_setup_clk0(uint32_t i2c, int32_t Fclk, si5351_drv_strength_t driveStrength);
 void si5351_setup_clk2(uint32_t i2c, int32_t Fclk, si5351_drv_strength_t driveStrength);
-void si5351_enable_outputs(uint8_t enabled);
+void si5351_enable_outputs(uint32_t i2c, uint8_t enabled);
 void si5351_write_bulk(uint32_t i2c, uint8_t baseaddr, int32_t P1, int32_t P2, int32_t P3, uint8_t divBy4, si5351_rdiv_t rdiv);
+
+#endif
