@@ -51,7 +51,7 @@ void spi_setup(
 	
 }
 
-void spi_tx_array16(int32_t spi, uint16_t* data, uint16_t len){
+void spi_set_cs(int32_t spi, uint8_t state){
 	uint32_t CS_PORT;
 	uint16_t CS_PIN;
 	if (spi == SPI1){
@@ -64,8 +64,16 @@ void spi_tx_array16(int32_t spi, uint16_t* data, uint16_t len){
 		CS_PORT = SPI1_A_PORT;
 		CS_PIN = SPI1_A_CS;
 	}
+	if (state){
+        	gpio_set(CS_PORT, CS_PIN);
+	} else {
+        	gpio_clear(CS_PORT, CS_PIN);
+	}
+}
+
+void spi_tx_array16(int32_t spi, uint16_t* data, uint16_t len){
         while (!(SPI_SR(spi) & SPI_SR_TXE));
-        gpio_clear(CS_PORT, CS_PIN);
+	spi_set_cs(spi, 0);
 	for (uint16_t i = 0; i < len; i++){
         	SPI_DR(spi) = data[i];
         	while (!(SPI_SR(spi) & SPI_SR_TXE));
@@ -74,8 +82,20 @@ void spi_tx_array16(int32_t spi, uint16_t* data, uint16_t len){
         (void)SPI_DR(spi);
         while(!(SPI_SR(spi) & SPI_SR_TXE));
         while(SPI_SR(spi) & SPI_SR_BSY);
-        gpio_set(CS_PORT, CS_PIN);
+	spi_set_cs(spi, 1);
 }
+
+void spi_tx_array16_nocs(int32_t spi, uint16_t* data, uint16_t len){
+	for (uint16_t i = 0; i < len; i++){
+        	SPI_DR(spi) = data[i];
+        	while (!(SPI_SR(spi) & SPI_SR_TXE));
+        	while (!(SPI_SR(spi) & SPI_SR_RXNE));
+	}
+        (void)SPI_DR(spi);
+        while(!(SPI_SR(spi) & SPI_SR_TXE));
+        while(SPI_SR(spi) & SPI_SR_BSY);
+}
+
 void spi_tx_array8(int32_t spi, uint8_t* data, uint16_t len){
 	uint16_t* a = (uint16_t*)malloc(len);
 	for (uint16_t i = 0; i < len; i++){
@@ -86,4 +106,27 @@ void spi_tx_array8(int32_t spi, uint8_t* data, uint16_t len){
 }
 void spi_tx(int32_t spi, uint16_t data){
 	spi_tx_array16(spi, &data, 1);
+}
+
+void spi_tx_nocs(int32_t spi, uint16_t data){
+	spi_tx_array16_nocs(spi, &data, 1);
+}
+
+void spi_tx8(int32_t spi, uint8_t data){
+	spi_tx_array8(spi, &data, 1);
+}
+
+uint8_t spi_rx_reg8(int32_t spi, uint8_t reg){
+	uint8_t result;
+        while (!(SPI_SR(spi) & SPI_SR_TXE));
+	spi_set_cs(spi, 0);
+        SPI_DR(spi) = (uint16_t)reg;
+       	while (!(SPI_SR(spi) & SPI_SR_TXE));
+        while (!(SPI_SR(spi) & SPI_SR_RXNE));
+	result =  (uint8_t)SPI_DR(spi);
+        (void)SPI_DR(spi);
+        while(!(SPI_SR(spi) & SPI_SR_TXE));
+        while(SPI_SR(spi) & SPI_SR_BSY);
+	spi_set_cs(spi, 1);
+	return result;
 }
