@@ -12,7 +12,7 @@
 #include <libopencm3/usb/dwc/otg_common.h>
 #include "cbuf.h"
 #define MAX_PACKET_SIZE 64
-#define TRX_BUFFER_SIZE 128
+#define TRX_BUFFER_SIZE 64
 
 extern const struct usb_device_descriptor dev;
 extern const struct usb_endpoint_descriptor comm_endp[];
@@ -32,8 +32,8 @@ extern const struct usb_config_descriptor config;
 extern usbd_device *usbd_dev_g;
 extern uint8_t usb_connected;
 
-extern cbuf_u8 tx_ring_buffer;
-extern cbuf_u8 rx_ring_buffer;
+extern rb_u8 tx_ring_buffer;
+extern rb_u8 rx_ring_buffer;
 static uint8_t cdc_rx_buffer_has_newline;
 
 enum usbd_request_return_codes cdcacm_control_request(usbd_device *usbd_dev,
@@ -46,6 +46,8 @@ void cdcacm_set_config(usbd_device *usbd_dev, uint16_t wValue);
 void init_usb_cdc(uint8_t enable_echo);
 void cdc_print(char* str);
 void cdc_send(uint8_t* data, uint16_t len);
+
+extern void get_cdc_comm_config(uint32_t speed, uint8_t stop_bits, uint8_t parity, uint8_t data_bits);
 
 #endif
 

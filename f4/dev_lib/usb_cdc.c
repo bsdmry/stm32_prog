@@ -7,20 +7,22 @@ static uint8_t cdc_tx_buffer[TRX_BUFFER_SIZE] = {0};
 static uint8_t cdc_rx_buffer[TRX_BUFFER_SIZE] = {0};
 static uint8_t cdc_rx_buffer_has_newline = 0;
 
-cbuf_u8 tx_ring_buffer = {
-        .buffer = cdc_tx_buffer,
-        .head = 0,
-        .tail = 0,
-        .length = 0,
-        .maxindex = TRX_BUFFER_SIZE - 1
+static struct usb_cdc_line_coding *line_coding;
+
+rb_u8 tx_ring_buffer = {
+	.data = cdc_tx_buffer,
+  	.size = sizeof(cdc_tx_buffer),
+  	.head = 0,
+  	.tail = 0,
+  	.length = 0	
 };
 
-cbuf_u8 rx_ring_buffer = {
-        .buffer = cdc_rx_buffer,
-        .head = 0,
-        .tail = 0,
-        .length = 0,
-        .maxindex = TRX_BUFFER_SIZE - 1
+rb_u8 rx_ring_buffer = {
+	.data = cdc_rx_buffer,
+  	.size = sizeof(cdc_rx_buffer),
+  	.head = 0,
+  	.tail = 0,
+  	.length = 0	
 };
 
 const struct usb_device_descriptor dev = {
@@ -157,9 +159,16 @@ static const char * usb_strings[] = {
 /* Buffer to be used for control requests. */
 uint8_t usbd_control_buffer[128];
 
-enum usbd_request_return_codes cdcacm_control_request(usbd_device *usbd_dev,
-	struct usb_setup_data *req, uint8_t **buf, uint16_t *len,
-	void (**complete)(usbd_device *usbd_dev, struct usb_setup_data *req))
+enum usbd_request_return_codes cdcacm_control_request(
+		usbd_device *usbd_dev,
+		struct usb_setup_data *req, 
+		uint8_t **buf, 
+		uint16_t *len,
+		void (**complete)(
+			usbd_device *usbd_dev, 
+			struct usb_setup_data *req
+		)
+)
 {
 	(void)complete;
 	(void)buf;
@@ -178,7 +187,14 @@ enum usbd_request_return_codes cdcacm_control_request(usbd_device *usbd_dev,
 		if (*len < sizeof(struct usb_cdc_line_coding)) {
 			return USBD_REQ_NOTSUPP;
 		}
-
+		//*line_coding = (struct usb_cdc_line_coding *)&buf;
+		line_coding = (struct usb_cdc_line_coding *)*buf;
+		get_cdc_comm_config(
+				line_coding->dwDTERate, 
+				line_coding->bCharFormat,
+			       	line_coding->bParityType,
+			       	line_coding->bDataBits
+		);
 		return USBD_REQ_HANDLED;
 	}
 	return USBD_REQ_NOTSUPP;
@@ -195,7 +211,7 @@ void cdcacm_data_rx_cb(usbd_device *usbd_dev, uint8_t ep)
 	if (len) {
 		for (int i = 0; i < len; i++){
 			if (buf[i] == 0x0A) {cdc_rx_buffer_has_newline = 1; }
-			buf_push_u8(&rx_ring_buffer, (uint8_t)buf[i]);
+			rb_u8_push(&rx_ring_buffer, (uint8_t)buf[i]);
 		}
 		if (cdc_enable_echo_flag) {
 			while (usbd_ep_write_packet(usbd_dev, 0x82, buf, len) == 0);
@@ -204,16 +220,13 @@ void cdcacm_data_rx_cb(usbd_device *usbd_dev, uint8_t ep)
 }
 
 void cdcacm_data_tx(usbd_device *usbd_dev){
-	//gpio_toggle(GPIOC, GPIO13);
 	if (usb_connected){
-		//gpio_toggle(GPIOC, GPIO13);
 		char buf[MAX_PACKET_SIZE];
 		uint8_t i;
 		while (tx_ring_buffer.length > 0) {
 			for (i = 0; i < MAX_PACKET_SIZE; i++){
-				int8_t res = buf_pop_u8(&tx_ring_buffer, &buf[i]);
-				if (res != 0) { break; }
-				//if (tx_ring_buffer.length == 0) {  break; }
+				uint8_t res = rb_u8_pop(&tx_ring_buffer, &buf[i]);
+				if (res == 0) { break; }
 			}
 			while (usbd_ep_stall_get(usbd_dev, 0x82)) {};
 			usbd_ep_write_packet(usbd_dev, 0x82, buf, i);
@@ -224,7 +237,7 @@ void cdcacm_data_tx(usbd_device *usbd_dev){
 void cdc_print(char* str){
 	if (usb_connected){
 		for (uint16_t i = 0; i < 65535; i++){
-			if (str[i] == 0) { break; } else { buf_push_u8(&tx_ring_buffer, (uint8_t)str[i]);}
+			if (str[i] == 0) { break; } else { rb_u8_push(&tx_ring_buffer, (uint8_t)str[i]);}
 		}
 	}
 }
@@ -232,7 +245,7 @@ void cdc_print(char* str){
 void cdc_send(uint8_t* data, uint16_t len){
 	if (usb_connected){
 		for (uint16_t i = 0; i < len; i++){
-			buf_push_u8(&tx_ring_buffer, data[i]);
+			rb_u8_push(&tx_ring_buffer, data[i]);
 		}
 	}
 }
@@ -279,6 +292,7 @@ void init_usb_cdc(uint8_t enable_echo){
 	cdc_enable_echo_flag = enable_echo;
 	/* Enable USB IRQs */
     	nvic_enable_irq(NVIC_OTG_FS_IRQ);
+	nvic_set_priority(NVIC_OTG_FS_IRQ, 1);
 }
 
 
