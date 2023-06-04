@@ -6,6 +6,10 @@
 
 
 void i2c_1_setup(void);
+void i2c_1_1_setup(void);
+void i2c_2_setup_407(void);
+void i2c_2_setup_411(void);
+void i2c_3_setup_407(void);
 void i2c_write_reg(uint32_t i2c, uint8_t dev_addr, uint8_t reg, uint8_t *data, uint8_t data_len);
 
 void i2c_write_reg_single(uint32_t i2c, uint8_t dev_addr, uint8_t reg, uint8_t data);
