@@ -1,7 +1,7 @@
 #ifndef SSD1306_H_
 #define SSD1306_H_
 #include "i2c.h"
-#include "/mnt/nfs/Work/stm32_include/oled1306_font.h"
+#include "oled1306_font.h"
 #include <string.h>
 
 
@@ -62,6 +62,11 @@ void set_area(uint32_t i2c, uint8_t x, uint8_t width, uint8_t y, uint8_t height)
 void set_xy(uint32_t i2c, uint8_t x, uint8_t y, uint8_t amode);
 void setup_ssd1306(uint32_t i2c, uint8_t amode);
 void fill_screen(uint32_t i2c, uint8_t amode);
-void print_number(uint32_t i2c, uint8_t x, uint8_t y, uint32_t number);
+//void print_number(uint32_t i2c, uint8_t x, uint8_t y, uint32_t number);
+uint8_t ssd1306_fill_char_mapping_array(uint8_t* char_map_indexes , int32_t number, uint8_t area_size, uint8_t zerolead_flag);
+void ssd1306_display_char_8x16(uint32_t i2c, uint8_t x, uint8_t y,  uint8_t* bitmap);	
+
+void ssd1306_send_numeric_8x16(uint32_t i2c, int32_t number, uint8_t x, uint8_t y, uint8_t area_size, uint8_t zerolead_flag);
+void ssd1306_send_string_8x16(uint32_t i2c, char* string, uint8_t x, uint8_t y);
 
 #endif /* SSD1306_H_ */
