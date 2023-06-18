@@ -1,4 +1,5 @@
 #include "cmd.h"
+#include "usart.h"
 
 #include <libopencm3/stm32/gpio.h>
 uint8_t cmd_parser_fsm = CMD_FSM_WAITING;
@@ -70,12 +71,13 @@ void parse_rcvr_param_string(void){
 	}
 }
 
-void parse_freq_string(void){
+void parse_freq_string(uint8_t cmdLen){
+	usart_send_string(USART2, freq_setup, FREQ_SETUP_STR_LENGHT);
+	usart_send_string(USART2, "=\n", 2);
 	for(uint8_t f = 0; f < 10; f++){
 		char_freq_params.freq[f] = freq_setup[f+1];
 	}
 	uint8_t mod_id = (uint8_t)freq_setup[12] - (uint8_t)freq_setup[11];
-	uint8_t band_id = (uint8_t)freq_setup[14] - (uint8_t)freq_setup[13];
 	switch (mod_id){
 		case 0: memcpy(char_freq_params.modulation, "LSB", 3); break;
 		case 1: memcpy(char_freq_params.modulation, "USB", 3); break;
@@ -83,17 +85,20 @@ void parse_freq_string(void){
 		case 3: memcpy(char_freq_params.modulation, " CW", 3); break;
 		case 4: memcpy(char_freq_params.modulation, "---", 3); break;
 		case 5: memcpy(char_freq_params.modulation, "NFM", 3); break;
-		case 6: memcpy(char_freq_params.modulation, "WFM", 3); break;
+		case 6: memcpy(char_freq_params.modulation, "WFM", 3); memcpy(char_freq_params.filter, "230k", 4); break;
 		default: break;
 	}
-	switch (band_id){
-		case 0: memcpy(char_freq_params.filter, "2.8k", 4); break;
-		case 1: memcpy(char_freq_params.filter, "  6k", 4); break;
-		case 2: memcpy(char_freq_params.filter, " 15k", 4); break;
-		case 3: memcpy(char_freq_params.filter, " 50k", 4); break;
-		case 4: memcpy(char_freq_params.filter, "230k", 4); break;
-		default: break;
-	}
+	//if (cmdLen >= (FREQ_SETUP_STR_LENGHT-1)){
+		uint8_t band_id = (uint8_t)freq_setup[14] - (uint8_t)freq_setup[13];
+		switch (band_id){
+			case 0: memcpy(char_freq_params.filter, "2.8k", 4); break;
+			case 1: memcpy(char_freq_params.filter, "  6k", 4); break;
+			case 2: memcpy(char_freq_params.filter, " 15k", 4); break;
+			case 3: memcpy(char_freq_params.filter, " 50k", 4); break;
+			case 4: memcpy(char_freq_params.filter, "230k", 4); break;
+			default: break;
+		}
+	//}
 	cmd_parser_fsm = CMD_FSM_WAITING;
 };
 
@@ -114,14 +119,31 @@ void detect_start_reply(char s){
 
 void handle_end_cmd(void){
 	switch (cmd_parser_fsm){	
-		case  CMD_FSM_FREQ_SET_START: parse_freq_string();  break;
+		case  CMD_FSM_FREQ_SET_START: 
+			parse_freq_string(freq_char_index);  
+			freq_char_index = 0;
+			break;
 		case CMD_FSM_RCVR_PARAM_SET_START: parse_rcvr_param_string();  break;
 		default: break;
 	}
 }
 
 void read_freq_setup(char s){
-	if (s != '\n'){
+	
+	if (((uint8_t)s >= 48) && ((uint8_t)s <= 57)){
+		freq_setup[freq_char_index] = s;
+		freq_char_index++;
+	} else if (s == '\r'){
+		freq_setup[freq_char_index] = s;
+		freq_char_index++;
+	} else if (s == '\n'){	
+		handle_end_cmd();
+	} else {
+		freq_char_index = 0;
+		cmd_parser_fsm = CMD_FSM_WAITING;
+	}
+
+	/*if (s != '\n'){
 		freq_setup[freq_char_index] = s;
 		if(freq_char_index + 1 >= FREQ_SETUP_STR_LENGHT){
 			freq_char_index = 0;
@@ -130,7 +152,7 @@ void read_freq_setup(char s){
 		}
 	} else {
 		handle_end_cmd();
-	}
+	}*/
 }
 
 void read_rcvr_param_setup(char s){

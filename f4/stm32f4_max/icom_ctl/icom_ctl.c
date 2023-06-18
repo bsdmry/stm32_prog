@@ -67,6 +67,7 @@ int main(void)
 	init_usb_cdc(1);
 	tim3_setup();
         usart_setup(USART1, 9600, 8, USART_STOPBITS_1, USART_MODE_TX_RX, USART_PARITY_NONE, USART_FLOWCONTROL_NONE );
+        usart_setup(USART2, 115200, 8, USART_STOPBITS_1, USART_MODE_TX, USART_PARITY_NONE, USART_FLOWCONTROL_NONE );
 	nvic_enable_irq(NVIC_USART1_IRQ);
 	usart_enable_rx_interrupt(USART1);
 	nvic_set_priority(NVIC_USART1_IRQ, 2);

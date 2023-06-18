@@ -49,7 +49,7 @@ void parse_agc_state(void);
 void parse_nb_state(void);
 void parse_att_state(void);
 void parse_rcvr_param_string(void);
-void parse_freq_string(void);
+void parse_freq_string(uint8_t cmdLen);
 void handle_end_cmd(void);
 void read_freq_setup(char s);
 void read_rcvr_param_setup(char s);
