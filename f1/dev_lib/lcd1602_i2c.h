@@ -7,8 +7,9 @@
 #include <libopencm3/stm32/gpio.h>
 #include <string.h>
 
-//#define LCD1602_ADDR 0x27
-#define LCD1602_ADDR 0x3F
+#define LCD1602_ADDR 0x20 //PCF8574
+//#define LCD1602_ADDR 0x27 //PCF8574T
+//#define LCD1602_ADDR 0x3F
 #define LCD1602_BACKLIGHT 0x08
 #define LCD1602_ENABLE 0x04
 #define LCD1602_WIDTH 20   // Maximum characters per line
