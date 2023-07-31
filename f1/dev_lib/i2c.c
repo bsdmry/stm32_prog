@@ -30,6 +30,20 @@ void i2c_1_1_setup(void){
 	i2c_peripheral_enable(I2C1);
 }
 
+void i2c_2_setup(void){
+	rcc_periph_clock_enable(RCC_GPIOB);
+	rcc_periph_clock_enable(RCC_AFIO);
+	rcc_periph_clock_enable(RCC_I2C2);
+	
+	gpio_set_mode(GPIOB, GPIO_MODE_OUTPUT_50_MHZ , GPIO_CNF_OUTPUT_ALTFN_OPENDRAIN , GPIO10 | GPIO11);
+
+	i2c_peripheral_disable(I2C2);
+	i2c_reset(I2C2);
+	i2c_set_own_7bit_slave_address(I2C2, 0x00);
+	i2c_set_speed(I2C2, i2c_speed_sm_100k, rcc_apb1_frequency/1000000);
+	i2c_peripheral_enable(I2C2);
+}
+
 void i2c_write_reg(uint32_t i2c, uint8_t dev_addr, uint8_t reg, uint8_t *data, uint8_t data_len)
 {
 	while(I2C_SR2(i2c) & I2C_SR2_BUSY){}
