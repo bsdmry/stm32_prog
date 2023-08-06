@@ -4,7 +4,7 @@
 #include <libopencm3/stm32/adc.h>
 #include <libopencm3/cm3/nvic.h>
 #include "i2c.h"
-#include "lcd1602_i2c.h"
+#include "winstar_lcd.h"
 #include "si5351.h"
 #include "dwt.h"
 #include "encoder.h"
@@ -60,6 +60,7 @@ uint8_t dot_press = 0;
 
 m62429* snd;
 planet_v2 radioCfg;
+winstar_lcd* display;
 
 static void clock_setup(void)
 {
@@ -149,7 +150,8 @@ void adc_setup(void){
 void display_setup(void) {
 
 	i2c_1_setup();
-        lcd1602_init(I2C1);
+	display = winstar_init(WINSTAR_INTERFACE_I2C, I2C1, WINSTAR_PCF8574_ADDR);
+	display->backlight = 1;
 	gpio_set_mode(LED_PORT, GPIO_MODE_OUTPUT_10_MHZ,  GPIO_CNF_OUTPUT_PUSHPULL, RX_LED_PIN);
 	gpio_set_mode(LED_PORT, GPIO_MODE_OUTPUT_10_MHZ,  GPIO_CNF_OUTPUT_PUSHPULL, TX_LED_PIN);
 	gpio_set(LED_PORT, RX_LED_PIN);
@@ -182,11 +184,11 @@ void show_main_screen(void){
 }
 
 void display_frequency(void){
-        lcd1602_display_numeric(I2C1, radioCfg.kHz + 7000, 3,  1, 0);
-        lcd1602_display(I2C1, ".", 1, 4);
-        lcd1602_display_numeric(I2C1, radioCfg.hHz, 0, 1, 5);
-        lcd1602_display(I2C1, "  ", 1, 6);
-        lcd1602_display(I2C1, "--------", 2, 0);
+        winstar_display_numeric(display, radioCfg.kHz + 7000, 3,  1, 0);
+        winstar_display(display, ".", 1, 4);
+        winstar_display_numeric(display, radioCfg.hHz, 0, 1, 5);
+        winstar_display(display, "  ", 1, 6);
+        winstar_display(display, "--------", 2, 0);
 }
 
 void update_frequency(uint32_t value){
@@ -470,67 +472,67 @@ void btn2_action(void){//exit-chg freq view
 void show_menu_rx_audio_vol(void) { 
 	ui_fsm_state = FSM_RX_AUDIO_VOL_SELECT; 
 	set_encoder(0, MENU_MAX); 
-        lcd1602_display(I2C1, "*1* Recv", 1, 0); lcd1602_display(I2C1, " snd lvl", 2, 0);
+        winstar_display(display, "*1* Recv", 1, 0); winstar_display(display, " snd lvl", 2, 0);
 }
 void show_menu_tx_tone_vol(void) { 
 	ui_fsm_state = FSM_TX_TONE_VOL_SELECT;
-        lcd1602_display(I2C1, "*2* Tone", 1, 0); lcd1602_display(I2C1, " snd lvl", 2, 0);
+        winstar_display(display, "*2* Tone", 1, 0); winstar_display(display, " snd lvl", 2, 0);
 }
 void show_menu_tx_tone_freq(void) { 
 	ui_fsm_state = FSM_TX_TONE_FREQ_SELECT; 
-        lcd1602_display(I2C1, "*3* Tone", 1, 0); lcd1602_display(I2C1, "  freq  ", 2, 0);
+        winstar_display(display, "*3* Tone", 1, 0); winstar_display(display, "  freq  ", 2, 0);
 }
 void show_menu_tx_offset(void) { 
 	ui_fsm_state = FSM_TX_OFFSET_SELECT; 
-        lcd1602_display(I2C1, "*4* Trx ", 1, 0); lcd1602_display(I2C1, " offset ", 2, 0);
+        winstar_display(display, "*4* Trx ", 1, 0); winstar_display(display, " offset ", 2, 0);
 }
 void show_menu_step_select(void) { 
 	ui_fsm_state = FSM_STEP_SELECT; 
-        lcd1602_display(I2C1, "*5* Step", 1, 0); lcd1602_display(I2C1, "  size  ", 2, 0);
+        winstar_display(display, "*5* Step", 1, 0); winstar_display(display, "  size  ", 2, 0);
 }
 void show_menu_cw_speed(void) { 
 	ui_fsm_state = FSM_CW_SPEED_SELECT; 
-        lcd1602_display(I2C1, "*6* CW", 1, 0); lcd1602_display(I2C1, "TX speed", 2, 0);
+        winstar_display(display, "*6* CW", 1, 0); winstar_display(display, "TX speed", 2, 0);
 }
 
 /* Menu entities end*/
 
 /* Re-display settings*/
 void redisplay_rx_audio_vol(void){ 
-        lcd1602_display(I2C1, "Recv lvl", 1, 0); 
-        lcd1602_display(I2C1, "  ", 2, 0);
-	lcd1602_display_numeric(I2C1, (uint16_t)(radioCfg.rxVolLevel), 2,  2, 2);
-        lcd1602_display(I2C1, "%  ", 2, 5);
+        winstar_display(display, "Recv lvl", 1, 0); 
+        winstar_display(display, "  ", 2, 0);
+	winstar_display_numeric(display, (uint16_t)(radioCfg.rxVolLevel), 2,  2, 2);
+        winstar_display(display, "%  ", 2, 5);
 }
 void redisplay_tx_tone_vol(void){ 
-        lcd1602_display(I2C1, "Tone lvl", 1, 0); 
-        lcd1602_display(I2C1, "  ", 2, 0);
-	lcd1602_display_numeric(I2C1, (uint16_t)(radioCfg.toneVolLevel), 2,  2, 2);
-        lcd1602_display(I2C1, "%  ", 2, 5);
+        winstar_display(display, "Tone lvl", 1, 0); 
+        winstar_display(display, "  ", 2, 0);
+	winstar_display_numeric(display, (uint16_t)(radioCfg.toneVolLevel), 2,  2, 2);
+        winstar_display(display, "%  ", 2, 5);
 }
 void redisplay_tx_tone_freq(void){ 
-        lcd1602_display(I2C1, "Tone frq", 1, 0); 
-        lcd1602_display(I2C1, "  ", 2, 0);
-	lcd1602_display_numeric(I2C1, (uint16_t)(radioCfg.toneFreq), 3,  2, 2);
-        lcd1602_display(I2C1, "  ", 2, 6);
+        winstar_display(display, "Tone frq", 1, 0); 
+        winstar_display(display, "  ", 2, 0);
+	winstar_display_numeric(display, (uint16_t)(radioCfg.toneFreq), 3,  2, 2);
+        winstar_display(display, "  ", 2, 6);
 }
 void redisplay_tx_offset(void){ 
-        lcd1602_display(I2C1, "Tx offst", 1, 0); 
-        lcd1602_display(I2C1, "  ", 2, 0);
-	lcd1602_display_numeric(I2C1, (uint16_t)(radioCfg.txOffset), 3,  2, 2);
-        lcd1602_display(I2C1, "  ", 2, 6);
+        winstar_display(display, "Tx offst", 1, 0); 
+        winstar_display(display, "  ", 2, 0);
+	winstar_display_numeric(display, (uint16_t)(radioCfg.txOffset), 3,  2, 2);
+        winstar_display(display, "  ", 2, 6);
 }
 void redisplay_step(void){ 
-        lcd1602_display(I2C1, "Step chg", 1, 0); 
-        lcd1602_display(I2C1, " ", 2, 0);
-	lcd1602_display_numeric(I2C1, (uint16_t)(radioCfg.txOffset), 3,  2, 1);
-        lcd1602_display(I2C1, "Hz ", 2, 5);
+        winstar_display(display, "Step chg", 1, 0); 
+        winstar_display(display, " ", 2, 0);
+	winstar_display_numeric(display, (uint16_t)(radioCfg.txOffset), 3,  2, 1);
+        winstar_display(display, "Hz ", 2, 5);
 }
 void redisplay_cw_speed(void){ 
-        lcd1602_display(I2C1, "CW speed", 1, 0); 
-        lcd1602_display(I2C1, "   ", 2, 0);
-	lcd1602_display_numeric(I2C1, (uint16_t)(radioCfg.cwSpeed), 1, 2, 3);
-        lcd1602_display(I2C1, "   ", 2, 5);
+        winstar_display(display, "CW speed", 1, 0); 
+        winstar_display(display, "   ", 2, 0);
+	winstar_display_numeric(display, (uint16_t)(radioCfg.cwSpeed), 1, 2, 3);
+        winstar_display(display, "   ", 2, 5);
 }
 /* Re-read and re-display settings end*/
 
