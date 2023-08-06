@@ -63,6 +63,7 @@ void show_menu_tx_tone_freq(void);
 void show_menu_tx_offset(void); 
 void show_menu_step_select(void); 
 void show_menu_cw_speed(void);
+void show_menu_backlight(void);
 
 void redisplay_rx_audio_vol(void);
 void redisplay_tx_tone_vol(void);
@@ -70,6 +71,7 @@ void redisplay_tx_tone_freq(void);
 void redisplay_tx_offset(void);
 void redisplay_step(void);
 void redisplay_cw_speed(void);
+void redisplay_backlight(void);
 
 void show_edit_rx_audio_vol(void); 
 void show_edit_tx_tone_vol(void);
@@ -77,6 +79,7 @@ void show_edit_tx_tone_freq(void);
 void show_edit_tx_offset(void);
 void show_edit_step(void);
 void show_edit_cw_speed(void);
+void show_edit_backlight(void);
 
 void show_update_rx_audio_vol(uint32_t value);
 void show_update_tx_tone_vol(uint32_t value);
@@ -84,6 +87,7 @@ void show_update_tx_tone_freq(uint32_t value);
 void show_update_tx_offset(uint32_t value);
 void show_update_step(uint32_t value);
 void show_update_cw_speed(uint32_t value);
+void show_update_backlight(uint32_t value);
 
 void roll_over_menu(uint16_t position);
 

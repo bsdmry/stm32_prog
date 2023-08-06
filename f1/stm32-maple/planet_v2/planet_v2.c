@@ -24,22 +24,29 @@ volatile uint8_t tx_flag = 0;
 volatile uint8_t tone_gen = 0;
 
 #define FSM_MAIN_RX 0
+
 #define FSM_RX_AUDIO_VOL_SELECT 1
 #define FSM_TX_TONE_VOL_SELECT 2
 #define FSM_TX_TONE_FREQ_SELECT 3
 #define FSM_TX_OFFSET_SELECT 4
 #define FSM_STEP_SELECT 5
 #define FSM_CW_SPEED_SELECT 6
-#define FSM_RX_AUDIO_VOL_CHG 7
-#define FSM_TX_TONE_VOL_CHG 8
-#define FSM_TX_TONE_FREQ_CHG 9
-#define FSM_TX_OFFSET_CHG 10
-#define FSM_STEP_CHG 11
-#define FSM_CW_SPEED_CHG 12
-#define FSM_TX 13
+#define FSM_BACKLIGHT_SELECT 7
+
+#define FSM_RX_AUDIO_VOL_CHG 8
+#define FSM_TX_TONE_VOL_CHG 9
+#define FSM_TX_TONE_FREQ_CHG 10
+#define FSM_TX_OFFSET_CHG 11
+#define FSM_STEP_CHG 12
+#define FSM_CW_SPEED_CHG 13
+#define FSM_BACKLIGHT_CHG 14
+
+#define FSM_TX 15
+
+#define MENU_MAX 6 //Max menu index (from zero)
+
 volatile uint8_t ui_fsm_state = FSM_MAIN_RX;
 
-#define MENU_MAX 5
 #define AUDIO_VOL_MAX 100
 #define TONE_VOL_MAX 100
 #define TONE_FREQ_MAX 1000
@@ -48,6 +55,7 @@ volatile uint8_t ui_fsm_state = FSM_MAIN_RX;
 #define CW_SPEED_MAX 3
 #define MAIN_KHZ_MAX 200
 #define MAIN_HHZ_MAX 2000
+#define BACKLIGHT_MAX 1
 
 uint8_t btn0_trg = 0;
 uint8_t btn0_press = 0;
@@ -416,6 +424,7 @@ void roll_over_menu(uint16_t position){
 		case 3: show_menu_tx_offset(); break;
 		case 4: show_menu_step_select(); break;
 		case 5: show_menu_cw_speed(); break;
+		case 6: show_menu_backlight(); break;
 		default: break;
 	}
 }
@@ -429,12 +438,15 @@ void rotary_action(void){
 		case FSM_TX_OFFSET_SELECT: roll_over_menu(rotary_pos); break;
 		case FSM_STEP_SELECT: roll_over_menu(rotary_pos); break;
 		case FSM_CW_SPEED_SELECT: roll_over_menu(rotary_pos); break;
+		case FSM_BACKLIGHT_SELECT: roll_over_menu(rotary_pos); break;
+
 		case FSM_RX_AUDIO_VOL_CHG: show_update_rx_audio_vol(rotary_pos); break;
 		case FSM_TX_TONE_VOL_CHG: show_update_tx_tone_vol(rotary_pos); break;
 		case FSM_TX_TONE_FREQ_CHG: show_update_tx_tone_freq(rotary_pos); break;
 		case FSM_TX_OFFSET_CHG: show_update_tx_offset(rotary_pos); break;
 		case FSM_STEP_CHG: show_update_step(rotary_pos); break;
 		case FSM_CW_SPEED_CHG: show_update_cw_speed(rotary_pos); break;
+		case FSM_BACKLIGHT_CHG: show_update_backlight(rotary_pos); break;
 		default: break;
 	}
 }
@@ -451,6 +463,7 @@ void btn1_action(void){ //config-enter
 		case FSM_TX_OFFSET_SELECT: radioCfg.currentMenuEntity = 3; show_edit_tx_offset(); break;
 		case FSM_STEP_SELECT: radioCfg.currentMenuEntity = 4; show_edit_step(); break;
 		case FSM_CW_SPEED_SELECT: radioCfg.currentMenuEntity = 5; show_edit_cw_speed(); break;
+		case FSM_BACKLIGHT_SELECT: radioCfg.currentMenuEntity = 6; show_edit_backlight(); break;
 		default: break;
 	}
 }
@@ -463,6 +476,7 @@ void btn2_action(void){//exit-chg freq view
 		case FSM_TX_OFFSET_CHG: set_encoder(radioCfg.currentMenuEntity, MENU_MAX); show_menu_tx_offset(); break;
 		case FSM_STEP_CHG: set_encoder(radioCfg.currentMenuEntity, MENU_MAX); show_menu_step_select();  break;
 		case FSM_CW_SPEED_CHG: set_encoder(radioCfg.currentMenuEntity, MENU_MAX); show_menu_cw_speed(); break;
+		case FSM_BACKLIGHT_CHG: set_encoder(radioCfg.currentMenuEntity, MENU_MAX); show_menu_backlight(); break;
 		default: show_main_screen();  break;
 	}
 }
@@ -493,6 +507,10 @@ void show_menu_step_select(void) {
 void show_menu_cw_speed(void) { 
 	ui_fsm_state = FSM_CW_SPEED_SELECT; 
         winstar_display(display, "*6* CW", 1, 0); winstar_display(display, "TX speed", 2, 0);
+}
+void show_menu_backlight(void) { 
+	ui_fsm_state = FSM_BACKLIGHT_SELECT; 
+        winstar_display(display, "*7* Back", 1, 0); winstar_display(display, "light   ", 2, 0);
 }
 
 /* Menu entities end*/
@@ -534,6 +552,12 @@ void redisplay_cw_speed(void){
 	winstar_display_numeric(display, (uint16_t)(radioCfg.cwSpeed), 1, 2, 3);
         winstar_display(display, "   ", 2, 5);
 }
+void redisplay_backlight(void){ 
+        winstar_display(display, "Bcklight", 1, 0); 
+        winstar_display(display, "   ", 2, 0);
+	winstar_display_numeric(display, (uint16_t)(display->backlight), 1, 2, 3);
+        winstar_display(display, "   ", 2, 5);
+}
 /* Re-read and re-display settings end*/
 
 /* Setting editor entities */
@@ -570,6 +594,11 @@ void show_edit_cw_speed(void){
 	redisplay_cw_speed();
 	set_encoder(radioCfg.cwSpeed, CW_SPEED_MAX); 
 }
+void show_edit_backlight(void){ 
+	ui_fsm_state = FSM_BACKLIGHT_CHG; 
+	redisplay_backlight();
+	set_encoder(display->backlight, BACKLIGHT_MAX); 
+}
 
 /* Setting editor entities end*/
 
@@ -600,6 +629,10 @@ void show_update_step(uint32_t value){
 void show_update_cw_speed(uint32_t value){
 	radioCfg.cwSpeed = (uint16_t)value;
 	redisplay_cw_speed();
+}
+void show_update_backlight(uint32_t value){
+	display->backlight = (uint8_t)value;
+	redisplay_backlight();
 }
 /* Settings update actions end */
 
