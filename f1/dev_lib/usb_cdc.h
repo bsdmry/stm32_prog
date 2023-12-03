@@ -2,6 +2,7 @@
 #define USB_CDC_H
 
 #include <stdlib.h>
+#include <string.h>
 #include <libopencm3/stm32/rcc.h>
 #include <libopencm3/stm32/gpio.h>
 #include <libopencm3/cm3/nvic.h>
@@ -46,6 +47,7 @@ void cdcacm_set_config(usbd_device *usbd_dev, uint16_t wValue);
 void init_usb_cdc(uint8_t enable_echo);
 void cdc_print(char* str);
 void cdc_send(uint8_t* data, uint16_t len);
+void cdc_dbg_print(char* msg, uint32_t data);
 void usb_dataline_rst(void);
 
 extern void get_cdc_comm_config(uint32_t speed, uint8_t stop_bits, uint8_t parity, uint8_t data_bits);

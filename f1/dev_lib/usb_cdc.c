@@ -251,6 +251,25 @@ void cdc_send(uint8_t* data, uint16_t len){
 	}
 }
 
+void cdc_dbg_print(char* msg, uint32_t data){
+	uint32_t len = strlen(msg);
+	uint32_t slen = len + 1 + 10 + 2 + 1;  //text len + space + number + \r\n + NULL
+	char *str = (char *)malloc(sizeof(char)*slen);
+	memset(str, 0x20, slen);
+	memcpy(str, msg, len);
+	str[len+1] = '0';
+	str[len+2] = 'x';
+	char data_s[11] = {0x20};
+	itoa(data, data_s, 16);
+	uint16_t data_s_len = strlen(data_s);
+	memcpy(str+len+3, data_s, data_s_len);
+	str[slen-3] = '\r';
+	str[slen-2] = '\n';
+	str[slen-1] = 0;
+	cdc_print(str);
+	free(str);
+}
+
 void usb_disconnect_cb(void){
 	usb_connected = 0;
 }
