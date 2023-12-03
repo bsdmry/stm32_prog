@@ -26,7 +26,7 @@ void flash_memory_config_container_save(flash_storage* storage){
 	uint32_t index_start_address = storage->storage_start_address + sizeof(uint32_t);
 	uint32_t data_start_address = index_start_address + (sizeof(uint32_t))*storage->options_count;
 	uint32_t index_record_word = 0;
-	flash_memory_storage_write(storage->storage_start_address, (uint32_t)storage->options_count); //Save number of option records
+	flash_memory_storage_write(storage->storage_start_address, ((uint32_t)storage->options_count | 0xABCD0000)); //Save number of option records with container id
 	for (uint8_t i = 0; i < storage->options_count; i++){
 		index_record_word = flash_memory_storage_make_record_word(storage->options[i].record_id, storage->options[i].len, data_start_address);
 		storage->options[i].address = data_start_address;
@@ -36,19 +36,25 @@ void flash_memory_config_container_save(flash_storage* storage){
 	}
 }
 
-void flash_memory_config_container_restore(flash_storage* storage){
+uint8_t flash_memory_config_container_restore(flash_storage* storage){
+	uint8_t result = 1;
 	uint32_t record_nums = 0;
 	uint32_t index_start_address = storage->storage_start_address + sizeof(uint32_t);
 	flash_memory_storage_read(storage->storage_start_address, &record_nums); //Restore number of options
-	storage->options_count = (uint8_t)record_nums;
-	storage->options = malloc(sizeof(option_record)* record_nums);
+	if ((record_nums >> 16) == 0xABCD){ // It is a config container 
+		result = 0;
+		record_nums = record_nums & 0x0000FFFF;
+		storage->options_count = (uint8_t)record_nums;
+		storage->options = malloc(sizeof(option_record)* record_nums);
 
-	for (uint8_t i = 0; i < storage->options_count; i++){
-		uint32_t record_word = 0;
-		flash_memory_storage_read(index_start_address, &record_word);
-		flash_memory_storage_decode_record_word(&(storage->options[i]), record_word);
-		index_start_address = index_start_address + sizeof(uint32_t);
+		for (uint8_t i = 0; i < storage->options_count; i++){
+			uint32_t record_word = 0;
+			flash_memory_storage_read(index_start_address, &record_word);
+			flash_memory_storage_decode_record_word(&(storage->options[i]), record_word);
+			index_start_address = index_start_address + sizeof(uint32_t);
+		}
 	}
+	return result;
 }
 void flash_memory_write_option(flash_storage* storage, uint8_t id, uint16_t data_len, uint32_t *data){
 	if (data_len > 1023){

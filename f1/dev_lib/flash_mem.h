@@ -29,7 +29,7 @@ uint32_t flash_memory_storage_make_record_word(uint8_t record_id, uint16_t len, 
 void flash_memory_storage_decode_record_word(option_record* record, uint32_t word);
 
 void flash_memory_config_container_save(flash_storage* storage);
-void flash_memory_config_container_restore(flash_storage* storage);
+uint8_t flash_memory_config_container_restore(flash_storage* storage);
 
 void flash_memory_write_option(flash_storage* storage, uint8_t id, uint16_t data_len, uint32_t *data);
 void flash_memory_read_option(flash_storage* storage, uint8_t id, uint32_t *data);
