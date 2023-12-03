@@ -10,7 +10,8 @@
 #define KEY_DIT_PIN GPIO7
 
 #define KEYBOARD_POLLER_PRESCALER 1600
-#define KEY_POLLER_PRESCALER 1300
+#define KEY_POLLER_PRESCALER 800 //1300
+#define SCREEN_REFRESH_PRESCALER 4000
 
 #define TONE_PORT GPIOC
 #define TONE_PIN GPIO13
@@ -36,6 +37,9 @@ void rf_setup(void);
 void rotary_action(void);
 void adc_setup(void);
 
+void save_cfg_on_flash(void);
+void restore_cfg_from_flash(void);
+
 void radio_init_cfg(void);
 void show_main_screen(void);
 void setup_cw_len(uint8_t signal);
@@ -43,6 +47,7 @@ void display_frequency(void);
 void update_frequency(uint32_t value);
 void set_encoder(uint32_t value, uint32_t max_value);
 uint32_t read_adc(void);
+void build_charge_string(uint32_t voltage, char *str);
 
 void btn0_action(void); //chg vol
 void btn1_action(void); //config-enter
