@@ -9,10 +9,22 @@
 #define REPLY_FSM_WAITING 0 
 #define REPLY_FSM_SIGNAL_PARAMS 1
 
+#define STATE_FSM_MAIN 0
+#define STATE_FSM_RECIVER_OPTIONS 1
+#define STATE_FSM_CONTROL_MODE 2
+
 #define FREQ_SETUP_STR_LENGHT  18
 #define RCVR_PARAM_SETUP_STR_LENGHT  5
 
 #define SIGNAL_PARAM_REPLY_STR_LENGTH 3
+
+#define ICOM_HAS_CFG 1
+#define ICOM_HASNT_CFG 0
+
+#define CONTROL_MODE_NONE 0
+#define CONTROL_MODE_STANDALONE 1
+#define CONTROL_MODE_BRIDGE 2
+
 
 typedef struct {
 	char freq[10];
@@ -21,20 +33,22 @@ typedef struct {
 } FreqParams;
 
 typedef struct {
-	uint8_t volume;
-	char strVolume[2];
-	uint8_t squelch_level;
-	char strSquelch[3];
+	uint8_t volume; 		// volume level for command
+	char strVolume[2];		// two chars for bargraph volume representation
+	uint8_t squelch_level;		// squelch level for command
+	char strSquelch[3];		// string sqelch representation
 	uint8_t if_shift_value;
 	uint8_t agc_state;
-	char strAgc[4];
 	uint8_t noise_blanker_state;
-	char strNb[3];
 	uint8_t attenuator_state;
-	char strAtt[4];
 	uint8_t signalLevel;
 	uint8_t sqlState;
 	uint8_t sigCenter;
+	uint8_t wasInit;
+	uint8_t controlMode;
+	uint32_t frequency;
+	uint8_t modulation;
+	uint8_t filter;
 } RecieverParams;
 
 void detect_start_cmd(char s);

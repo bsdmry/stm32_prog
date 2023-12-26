@@ -1,6 +1,6 @@
 #include "cmd.h"
 #include "usart.h"
-
+#include <stdlib.h>
 #include <libopencm3/stm32/gpio.h>
 uint8_t cmd_parser_fsm = CMD_FSM_WAITING;
 uint8_t reply_parser_fsm = REPLY_FSM_WAITING;
@@ -8,8 +8,29 @@ char freq_setup[FREQ_SETUP_STR_LENGHT];
 uint8_t freq_char_index = 0;
 
 
-FreqParams char_freq_params = {"0000000000", " CW", "2.8k"};
-RecieverParams int_rcvr_params = {0,"\x07\x20", 0,"Sq\x20", 0, 0, "Ag0 ", 0, "Nb0", 0, " At0", 0, 0, 0};
+FreqParams char_freq_params = {
+	.freq = "0000000000", 
+	.modulation =  " CW", 
+	.filter =  "2.8k"
+};
+RecieverParams int_rcvr_params = {
+	.volume = 0, 
+	.strVolume = "\x07\x20", 
+	.squelch_level = 0, 
+	.strSquelch = "Sq\x20", 
+	.if_shift_value = 0, 
+	.agc_state = 0, 
+	.noise_blanker_state = 0, 
+	.attenuator_state =  0, 
+	.signalLevel =  0, 
+	.sqlState = 0, 
+	.sigCenter =  0,
+	.wasInit = ICOM_HASNT_CFG,
+	.controlMode = CONTROL_MODE_NONE,
+	.frequency = 1000000,
+	.modulation = 0,
+	.filter = 0
+};
 
 char rcvr_param_setup[RCVR_PARAM_SETUP_STR_LENGHT];
 uint8_t rcvr_param_char_index = 0;
@@ -45,17 +66,14 @@ void parse_if_shift(void){
 }
 void parse_agc_state(void){
 	int_rcvr_params.agc_state = get_int_rcvr_param(&rcvr_param_setup[2]);
-	int_rcvr_params.strAgc[3] =  int_rcvr_params.agc_state ? '1' : '0';
 	cmd_parser_fsm = CMD_FSM_WAITING;
 }
 void parse_nb_state(void){
 	int_rcvr_params.noise_blanker_state = get_int_rcvr_param(&rcvr_param_setup[2]);
-	int_rcvr_params.strNb[2] =  int_rcvr_params.noise_blanker_state ? '1' : '0';
 	cmd_parser_fsm = CMD_FSM_WAITING;
 }
 void parse_att_state(void){
 	int_rcvr_params.attenuator_state = get_int_rcvr_param(&rcvr_param_setup[2]);
-	int_rcvr_params.strAtt[3] =  int_rcvr_params.attenuator_state ? '1' : '0';
 	cmd_parser_fsm = CMD_FSM_WAITING;
 }
 
@@ -77,7 +95,9 @@ void parse_freq_string(uint8_t cmdLen){
 	for(uint8_t f = 0; f < 10; f++){
 		char_freq_params.freq[f] = freq_setup[f+1];
 	}
+	int_rcvr_params.frequency = (uint32_t)strtol(char_freq_params.freq, NULL, 10);
 	uint8_t mod_id = (uint8_t)freq_setup[12] - (uint8_t)freq_setup[11];
+	int_rcvr_params.modulation = mod_id;
 	switch (mod_id){
 		case 0: memcpy(char_freq_params.modulation, "LSB", 3); break;
 		case 1: memcpy(char_freq_params.modulation, "USB", 3); break;
@@ -90,6 +110,7 @@ void parse_freq_string(uint8_t cmdLen){
 	}
 	//if (cmdLen >= (FREQ_SETUP_STR_LENGHT-1)){
 		uint8_t band_id = (uint8_t)freq_setup[14] - (uint8_t)freq_setup[13];
+		int_rcvr_params.filter = band_id;
 		switch (band_id){
 			case 0: memcpy(char_freq_params.filter, "2.8k", 4); break;
 			case 1: memcpy(char_freq_params.filter, "  6k", 4); break;
