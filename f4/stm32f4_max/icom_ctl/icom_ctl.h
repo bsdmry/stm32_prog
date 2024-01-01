@@ -1,6 +1,22 @@
 void setup_controls(void);
 void handle_buttons(void);
+void handle_encoder(void);
 void show_main_screen(void);
 void show_reciever_options_screen(void);
 void show_connection_screen(void);
 void scan_buttons(void);
+void send_command(char* cmd, uint8_t len);
+void set_reciever_params(void);
+void set_volume(void);
+void set_squelch(void);
+void switch_agc(void);
+void switch_att(void);
+void switch_nb(void);
+void change_mod(void);
+void change_vol_sql_freq(void);
+void change_filter(void);
+void set_control_mode_standalone(void);
+void set_control_mode_bridge(void);
+void set_control_mode_none(void);
+uint8_t get_filter_width(uint8_t mod, uint8_t filter);
+

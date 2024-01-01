@@ -1,10 +1,15 @@
 #include <libopencm3/stm32/rcc.h>
 #include <libopencm3/stm32/timer.h>
+//include "/storage/Develop/gcc-arm-none-eabi-10.3-2021.10/arm-none-eabi/include/stdlib.h"
+//#include <newlib.h>
+#include <stdlib.h>
+#include "dwt.h"
 #include "icom_ctl.h"
 #include "usart.h"
 #include "usb_cdc.h"
 #include "i2c.h"
 #include "lcd1602_i2c.h"
+#include "encoder.h"
 #include "cmd.h"
 
 #define BTN_PORT GPIOE
@@ -16,6 +21,8 @@
 volatile uint8_t to_cdc_flag = 0;
 volatile uint8_t screen_update_flag = 0;
 uint8_t state_fsm = STATE_FSM_MAIN;
+uint8_t encoder_fsm = ENCODER_FSM_FREQ;
+uint32_t last_encoder = 0; //encoder position for frequency
 char lcd_line1[17];
 char lcd_line2[17];
 
@@ -79,16 +86,22 @@ static void tim3_setup(void)
 int main(void)
 {
 	clock_setup();
+	dwt_setup();
 	gpio_mode_setup(GPIOE, GPIO_MODE_OUTPUT, GPIO_PUPD_NONE, GPIO8);
-        gpio_clear(GPIOE, GPIO8);
+        gpio_set(GPIOE, GPIO8);
 	init_usb_cdc(1);
 	tim3_setup();
+
 	setup_controls();
         usart_setup(USART1, 9600, 8, USART_STOPBITS_1, USART_MODE_TX_RX, USART_PARITY_NONE, USART_FLOWCONTROL_NONE );
         usart_setup(USART2, 115200, 8, USART_STOPBITS_1, USART_MODE_TX, USART_PARITY_NONE, USART_FLOWCONTROL_NONE );
+	usart_send_blocking(USART2, '+'); //DBG
 	nvic_enable_irq(NVIC_USART1_IRQ);
 	usart_enable_rx_interrupt(USART1);
 	nvic_set_priority(NVIC_USART1_IRQ, 2);
+
+	rotary_encoder_tim1_setup(9);
+	rotary_encoder_tim1_set_value(0);	
 
 	i2c_1_1_setup();
 	lcd1602_init(I2C1);
@@ -128,10 +141,12 @@ int main(void)
 			lcd1602_display(I2C1, lcd_line1, 1, 0);
 			lcd1602_display(I2C1, lcd_line2, 2, 0);
 			screen_update_flag = 0;
+			
 		}
 		if (btn_mod_trg || btn_a_trg || btn_b_trg || btn_c_trg ){
 			handle_buttons();
 		}
+			handle_encoder();
 	}
 }
 
@@ -205,14 +220,14 @@ void handle_buttons(void){
 		switch(state_fsm){
 			case STATE_FSM_MAIN: change_mod(); break;
 			case STATE_FSM_RECIVER_OPTIONS: switch_agc(); break;
-			case STATE_FSM_CONTROL_MODE: /*set_control_mode_none();*/ break;
+			case STATE_FSM_CONTROL_MODE: set_control_mode_none(); break;
 			default: break;
 		}
 		btn_a_trg = 0;
 	}
 	if (btn_b_trg){
 		switch(state_fsm){
-			case STATE_FSM_MAIN: /*change_filter();*/; break;
+			case STATE_FSM_MAIN: change_filter(); break;
 			case STATE_FSM_RECIVER_OPTIONS: switch_att(); break;
 			case STATE_FSM_CONTROL_MODE: set_control_mode_standalone(); break;
 			default: break;
@@ -221,18 +236,82 @@ void handle_buttons(void){
 	}
 	if (btn_c_trg){
 		switch(state_fsm){
-			case STATE_FSM_MAIN: /*change_vol();*/; break;
+			case STATE_FSM_MAIN: change_vol_sql_freq(); break;
 			case STATE_FSM_RECIVER_OPTIONS: switch_nb(); break;
-			case STATE_FSM_CONTROL_MODE: /*set_control_mode_bridge();*/ break;
+			case STATE_FSM_CONTROL_MODE: set_control_mode_bridge(); break;
 			default: break;
 		}
 		btn_c_trg = 0;
 	}
 }
 
+static void dbg_transmit(uint32_t number){
+        uint32_t div = 1000000000;
+        usart_send_blocking(USART2, 'D');
+        usart_send_blocking(USART2, '>');
+        while (div > 0) {
+                usart_send_blocking(USART2, ((uint8_t)(number / div) + 0x30));
+                number = number % div;
+                div /= 10;
+        }
+
+        usart_send_blocking(USART2, 0x0D);
+        usart_send_blocking(USART2, 0x0A);
+}
+
+
+void handle_encoder(void){
+	if (int_rcvr_params.controlMode == CONTROL_MODE_STANDALONE){
+		uint32_t cv = 0;
+		switch(encoder_fsm){
+			case ENCODER_FSM_FREQ:
+				cv = rotary_encoder_tim1_get_value();
+				int32_t delta = cv - last_encoder;
+				if (delta != 0){
+					if ((last_encoder == 9) && (cv == 0)){
+                                        	delta = 1;
+                                	} else if ((last_encoder == 0) && (cv == 9)){
+                                        	delta = -1;
+                                	}
+					dbg_transmit(last_encoder);
+					dbg_transmit(cv);
+					int_rcvr_params.frequency = int_rcvr_params.frequency + (delta * int_rcvr_params.step);
+					dbg_transmit(int_rcvr_params.frequency);
+					set_reciever_params(); 
+				}
+				last_encoder = cv;
+				break;
+
+			case ENCODER_FSM_VOL:
+				cv = rotary_encoder_tim1_get_value();
+				if ((int_rcvr_params.volume == 255) && (cv == 0)){
+					rotary_encoder_tim1_set_value(255);	
+				} else if ((int_rcvr_params.volume == 0) && (cv == 255)){
+					rotary_encoder_tim1_set_value(0);	
+				} else {
+					int_rcvr_params.volume = (uint8_t)cv;
+					set_volume();
+				}
+				break;
+			case ENCODER_FSM_SQL:
+				cv = rotary_encoder_tim1_get_value();
+				if ((int_rcvr_params.squelch_level == 255) && (cv == 0)){
+					rotary_encoder_tim1_set_value(255);	
+				} else if ((int_rcvr_params.squelch_level == 0) && (cv == 255)){
+					rotary_encoder_tim1_set_value(0);	
+				} else {
+					int_rcvr_params.squelch_level = (uint8_t)cv;
+					set_squelch();
+				}
+				break;
+			default: break;
+		}
+	}
+}
+
 
 void set_control_mode_standalone(void){
-	int_rcvr_params.controlMod = CONTROL_MODE_STANDALONE;
+	int_rcvr_params.controlMode = CONTROL_MODE_STANDALONE;
 	if (int_rcvr_params.wasInit == ICOM_HASNT_CFG){
 		send_command("H101\r\n", 6);
 		dwt_delay_ms(500);
@@ -243,14 +322,34 @@ void set_control_mode_standalone(void){
 		send_command("G105\r\n", 6);
 		usart_disable(USART1);
 		usart_setup(USART1, 38400, 8, USART_STOPBITS_1, USART_MODE_TX_RX, USART_PARITY_NONE, USART_FLOWCONTROL_NONE );
-		dwt_delay_ms(500);
-		send_command("G301", 4);
-		
+		dwt_delay_ms(250);
+		send_command("G301", 4);	
 	}
 	set_reciever_params(); 
 	set_squelch();
 	set_volume();
+}
 
+void set_control_mode_bridge(void){
+	if ((int_rcvr_params.wasInit == ICOM_HAS_CFG) && 
+	(int_rcvr_params.controlMode == CONTROL_MODE_STANDALONE)){
+		send_command("G103\r\n", 6);
+		usart_disable(USART1);
+		usart_setup(USART1, 9600, 8, USART_STOPBITS_1, USART_MODE_TX_RX, USART_PARITY_NONE, USART_FLOWCONTROL_NONE );
+	}
+	int_rcvr_params.controlMode = CONTROL_MODE_BRIDGE;
+}
+
+void set_control_mode_none(void){
+	if ((int_rcvr_params.wasInit == ICOM_HAS_CFG) && 
+	(int_rcvr_params.controlMode == CONTROL_MODE_STANDALONE)){
+		send_command("G103\r\n", 6);
+		usart_disable(USART1);
+		usart_setup(USART1, 9600, 8, USART_STOPBITS_1, USART_MODE_TX_RX, USART_PARITY_NONE, USART_FLOWCONTROL_NONE );
+		dwt_delay_ms(250);
+		send_command("H100\r\n", 6);
+	}
+	int_rcvr_params.controlMode = CONTROL_MODE_NONE;
 }
 
 uint8_t get_filter_width(uint8_t mod, uint8_t filter){
@@ -280,7 +379,7 @@ uint8_t get_filter_width(uint8_t mod, uint8_t filter){
 		}
 	} else if (mod == 6){
 		if ((filter == 3) || (filter == 4)){
-			return filter
+			return filter;
 		} else {
 			return 4;
 		}
@@ -290,79 +389,107 @@ uint8_t get_filter_width(uint8_t mod, uint8_t filter){
 }
 
 void change_mod(void){
-	switch(int_rcvr_params.modulation){
-		case 0: //LSB
-			int_rcvr_params.modulation = 1; //USB
-			break;
-		case 1: //USB
-			int_rcvr_params.modulation = 2; //AM 
-			int_rcvr_params.filter = get_filter_width(2, int_rcvr_params.filter);
-			break;
-		case 2: //AM
-			int_rcvr_params.modulation = 3; //CW
-			int_rcvr_params.filter = get_filter_width(3, int_rcvr_params.filter);
-			break;
-		case 3: //CW
-			int_rcvr_params.modulation = 5; //NFM
-			int_rcvr_params.filter = get_filter_width(5, int_rcvr_params.filter);
-			break;
-		case 5: //NFM
-			int_rcvr_params.modulation = 6; //WFM
-			int_rcvr_params.filter = get_filter_width(6, int_rcvr_params.filter);
-			break;
-		case 6: //WFM
-			int_rcvr_params.modulation = 0; //LSB
-			int_rcvr_params.filter = get_filter_width(0, int_rcvr_params.filter);
-			break;
-		default: break;
+	if (int_rcvr_params.controlMode == CONTROL_MODE_STANDALONE){
+		switch(int_rcvr_params.modulation){
+			case 0: //LSB
+				int_rcvr_params.modulation = 1; //USB
+				break;
+			case 1: //USB
+				int_rcvr_params.modulation = 2; //AM 
+				int_rcvr_params.filter = get_filter_width(2, int_rcvr_params.filter);
+				break;
+			case 2: //AM
+				int_rcvr_params.modulation = 3; //CW
+				int_rcvr_params.filter = get_filter_width(3, int_rcvr_params.filter);
+				break;
+			case 3: //CW
+				int_rcvr_params.modulation = 5; //NFM
+				int_rcvr_params.filter = get_filter_width(5, int_rcvr_params.filter);
+				break;
+			case 5: //NFM
+				int_rcvr_params.modulation = 6; //WFM
+				int_rcvr_params.filter = get_filter_width(6, int_rcvr_params.filter);
+				break;
+			case 6: //WFM
+				int_rcvr_params.modulation = 0; //LSB
+				int_rcvr_params.filter = get_filter_width(0, int_rcvr_params.filter);
+				break;
+			default: break;
 
+		}
+		set_reciever_params(); 
 	}
-	set_reciever_params(); 
+}
+
+void change_vol_sql_freq(void){
+	if (int_rcvr_params.controlMode == CONTROL_MODE_STANDALONE){
+		switch (encoder_fsm){
+			case ENCODER_FSM_FREQ:
+				encoder_fsm = ENCODER_FSM_VOL;
+				rotary_encoder_tim1_set_value(0);
+				rotary_encoder_tim1_set_limit(255);
+				rotary_encoder_tim1_set_value(int_rcvr_params.volume);	
+				break;
+			case ENCODER_FSM_VOL:
+				encoder_fsm = ENCODER_FSM_SQL;
+				rotary_encoder_tim1_set_value(0);
+				rotary_encoder_tim1_set_limit(255);
+				rotary_encoder_tim1_set_value(int_rcvr_params.squelch_level);	
+				break;
+			case ENCODER_FSM_SQL:
+				encoder_fsm = ENCODER_FSM_FREQ;
+				rotary_encoder_tim1_set_value(0);
+				rotary_encoder_tim1_set_limit(9);
+				rotary_encoder_tim1_set_value(last_encoder);	
+				break;
+			default: break;
+		}
+	}
 }
 
 void change_filter(void){
-	uint8_t f = int_rcvr_params.filter;
-	uint8_t ssb_cw[5] = {1 ,0, 0, 0, 0};
-	uint8_t am[5] = {1, 2, 3, 0, 0};
-	uint8_t nfm[4] = {1, 2, 3, 1, 1};
-	uint8_t wfm[5] = {3, 3, 3, 4, 3};
+	if (int_rcvr_params.controlMode == CONTROL_MODE_STANDALONE){
+		uint8_t f = int_rcvr_params.filter;
+		uint8_t ssb_cw[5] = {1 ,0, 0, 0, 0};
+		uint8_t am[5] = {1, 2, 3, 0, 0};
+		uint8_t nfm[5] = {1, 2, 3, 1, 1};
+		uint8_t wfm[5] = {3, 3, 3, 4, 3};
 
-	switch (int_rcvr_params.modulation){
-		case 0: int_rcvr_params.filter = ssb_cw[f]; break;
-		case 1: int_rcvr_params.filter = ssb_cw[f]; break;
-		case 2: int_rcvr_params.filter = am[f]; break;
-		case 3: int_rcvr_params.filter = ssb_cw[f]; break;
-		case 5: int_rcvr_params.filter = nfm[f]; break;
-		case 6: int_rcvr_params.filter = wfm[f]; break;
-		default: break;
+		switch (int_rcvr_params.modulation){
+			case 0: int_rcvr_params.filter = ssb_cw[f]; break;
+			case 1: int_rcvr_params.filter = ssb_cw[f]; break;
+			case 2: int_rcvr_params.filter = am[f]; break;
+			case 3: int_rcvr_params.filter = ssb_cw[f]; break;
+			case 5: int_rcvr_params.filter = nfm[f]; break;
+			case 6: int_rcvr_params.filter = wfm[f]; break;
+			default: break;
+		}
+		set_reciever_params(); 
 	}
-	set_reciever_params(); 
 }
 
 void set_reciever_params(void){
-	char setup_str[20] = "K00000000000000000\r\n";	
-	char f[10] = "0000000000";
-	itoa(int_rcvr_params.frequency, f, 10);
-	memcpy(setup_str+2, f, 10);
+	char setup_str[] = "K00000000000000000\r\n";
+        int2str(int_rcvr_params.frequency, 10, &setup_str[2]);
 	setup_str[13] = (char)(int_rcvr_params.modulation + '0'); //12:13
 	setup_str[15] = (char)(int_rcvr_params.filter + '0'); //14:15
-	send_command(&setup_str, 20);
+	send_command(&setup_str[0], 20);
 }
 
 void set_volume(void){
 	char setup_str[7] = "J4000\r\n";
 	char v[2] = "  ";
-	itoa(int_rcvr_params.volume, v, 16);
+	itoa(int_rcvr_params.volume, &v[0], 16);
 	memcpy(setup_str+3, v, 2);
-	send_command(&setup_str, 7);
+	send_command(&setup_str[0], 7);
 }
 
 void set_squelch(void){
 	char setup_str[7] = "J4100\r\n";
 	char v[2] = "  ";
-	itoa(int_rcvr_params.squelch_level, v, 16);
+	itoa(int_rcvr_params.squelch_level, &v[0], 16);
 	memcpy(setup_str+3, v, 2);
-	send_command(&setup_str, 7);
+	send_command(&setup_str[0], 7);
 }
 
 void switch_agc(void){
@@ -436,9 +563,11 @@ void tim3_isr(void)
 }
 
 void send_command(char* cmd, uint8_t len){
-	if (int_rcvr_params.controlMod == CONTROL_MODE_STANDALONE){
+	if (int_rcvr_params.controlMode == CONTROL_MODE_STANDALONE){
+		usart_send_blocking(USART2, '>'); //DBG
 		for (uint8_t i = 0; i < len; i++){
-			rb_u8_push(&rx_ring_buffer, &cmd[i]);
+			rb_u8_push(&rx_ring_buffer, (uint8_t)cmd[i]);
+                	usart_send_blocking(USART2, cmd[i]); //DBG
 		}
 	}
 }
@@ -446,9 +575,12 @@ void send_command(char* cmd, uint8_t len){
 void usart1_isr(void){
 	uint8_t data = 0;
 	if (usart_get_flag(USART1, USART_SR_TXE)) {
+        gpio_toggle(GPIOE, GPIO8);
+		//usart_send_blocking(USART2, '>'); //DBG
                 while(rb_u8_pop(&rx_ring_buffer, &data)){
 			host_cmd_parser(data);
                         usart_send_blocking(USART1, data);
+                        //usart_send_blocking(USART2, data); //DBG
                 }
                 usart_disable_tx_interrupt(USART1);
                 
@@ -456,6 +588,7 @@ void usart1_isr(void){
 	if (usart_get_flag(USART1, USART_SR_RXNE)) {
                 data = (uint8_t)usart_recv(USART1);
 		radio_reply_parser(data);
+                //usart_send_blocking(USART2, data); //DBG
 		if (int_rcvr_params.controlMode == CONTROL_MODE_BRIDGE){
                 	rb_u8_push(&tx_ring_buffer, data);
 			to_cdc_flag = 1;
@@ -464,16 +597,18 @@ void usart1_isr(void){
 }
 
 void get_cdc_comm_config(uint32_t speed, uint8_t stop_bits, uint8_t parity, uint8_t data_bits){
-	const uint32_t stop_bit_map[3] = {USART_STOPBITS_1, USART_STOPBITS_1_5, USART_STOPBITS_2};
-	const uint32_t parity_map[5] = {
-		USART_PARITY_NONE, 
-		USART_PARITY_ODD, 
-		USART_PARITY_EVEN, 
-		USART_PARITY_NONE, //Not supported "Mark"
-		USART_PARITY_NONE, //Not supported "Space"
-	};
-	usart_disable(USART1);
-        usart_setup(USART1, speed, data_bits, stop_bit_map[stop_bits], USART_MODE_TX_RX, parity_map[parity], USART_FLOWCONTROL_NONE );
-	int_rcvr_params.wasInit = ICOM_HAS_CFG;
+	if (int_rcvr_params.controlMode == CONTROL_MODE_STANDALONE){
+		const uint32_t stop_bit_map[3] = {USART_STOPBITS_1, USART_STOPBITS_1_5, USART_STOPBITS_2};
+		const uint32_t parity_map[5] = {
+			USART_PARITY_NONE, 
+			USART_PARITY_ODD, 
+			USART_PARITY_EVEN, 
+			USART_PARITY_NONE, //Not supported "Mark"
+			USART_PARITY_NONE, //Not supported "Space"
+		};
+		usart_disable(USART1);
+        	usart_setup(USART1, speed, data_bits, stop_bit_map[stop_bits], USART_MODE_TX_RX, parity_map[parity], USART_FLOWCONTROL_NONE );
+		int_rcvr_params.wasInit = ICOM_HAS_CFG;
+	}
 
 }

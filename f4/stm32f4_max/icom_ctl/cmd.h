@@ -13,6 +13,10 @@
 #define STATE_FSM_RECIVER_OPTIONS 1
 #define STATE_FSM_CONTROL_MODE 2
 
+#define ENCODER_FSM_FREQ 0
+#define ENCODER_FSM_VOL 1
+#define ENCODER_FSM_SQL 2
+
 #define FREQ_SETUP_STR_LENGHT  18
 #define RCVR_PARAM_SETUP_STR_LENGHT  5
 
@@ -49,11 +53,13 @@ typedef struct {
 	uint32_t frequency;
 	uint8_t modulation;
 	uint8_t filter;
+	uint32_t step;
 } RecieverParams;
 
 void detect_start_cmd(char s);
 void detect_start_reply(char s);
 uint8_t strHex2int(char c);
+void int2str(uint32_t val, uint8_t strLen, char* recv);
 uint8_t get_int_rcvr_param(char* strValue);
 void value2symbol(uint8_t value, char* s);
 void parse_vol_level(void);
