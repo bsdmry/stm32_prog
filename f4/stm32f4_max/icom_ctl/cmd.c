@@ -54,6 +54,19 @@ void int2str(uint32_t val, uint8_t strLen, char* recv){
         }
 }
 
+void int2strhex(uint32_t val, uint8_t strLen, char* recv){
+        uint8_t dig;
+        for (uint8_t p = 0; p < strLen; p++) {
+                dig = val % 0x10;
+                if (dig > 9){
+                        recv[strLen - p - 1] = (char)(dig + 55);
+                } else {
+                        recv[strLen - p - 1] = (char)(dig + 48);
+                }
+                val /= 0x10;
+        }
+}
+
 uint8_t get_int_rcvr_param(char* strValue){
 	uint8_t n1 = strHex2int(strValue[0]);
 	uint8_t n2 = strHex2int(strValue[1]);
@@ -101,6 +114,7 @@ void parse_rcvr_param_string(void){
 }
 
 void parse_freq_string(uint8_t cmdLen){
+        gpio_toggle(GPIOE, GPIO8);
 	usart_send_string(USART2, freq_setup, FREQ_SETUP_STR_LENGHT);
 	usart_send_string(USART2, "=\n", 2);
 	for(uint8_t f = 0; f < 10; f++){
@@ -162,7 +176,6 @@ void handle_end_cmd(void){
 
 void read_freq_setup(char s){
 	
-        gpio_toggle(GPIOE, GPIO8);
 	if (((uint8_t)s >= 48) && ((uint8_t)s <= 57)){
 		freq_setup[freq_char_index] = s;
 		freq_char_index++;

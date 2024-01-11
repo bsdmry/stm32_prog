@@ -60,6 +60,7 @@ void detect_start_cmd(char s);
 void detect_start_reply(char s);
 uint8_t strHex2int(char c);
 void int2str(uint32_t val, uint8_t strLen, char* recv);
+void int2strhex(uint32_t val, uint8_t strLen, char* recv);
 uint8_t get_int_rcvr_param(char* strValue);
 void value2symbol(uint8_t value, char* s);
 void parse_vol_level(void);

@@ -320,10 +320,13 @@ void set_control_mode_standalone(void){
 		send_command("H101\r\n", 6);
 		dwt_delay_ms(500);
 		send_command("G105\r\n", 6);
+		dwt_delay_ms(100);
 		usart_disable(USART1);
 		usart_setup(USART1, 38400, 8, USART_STOPBITS_1, USART_MODE_TX_RX, USART_PARITY_NONE, USART_FLOWCONTROL_NONE );
-		dwt_delay_ms(250);
-		send_command("G301", 4);	
+		nvic_enable_irq(NVIC_USART1_IRQ);
+		usart_enable_rx_interrupt(USART1);
+	//	dwt_delay_ms(250);
+		send_command("G301\r\n", 6);	
 	}
 	set_reciever_params(); 
 	set_squelch();
@@ -478,17 +481,13 @@ void set_reciever_params(void){
 
 void set_volume(void){
 	char setup_str[7] = "J4000\r\n";
-	char v[2] = "  ";
-	itoa(int_rcvr_params.volume, &v[0], 16);
-	memcpy(setup_str+3, v, 2);
+	int2strhex(int_rcvr_params.volume, 2, &setup_str[3]);
 	send_command(&setup_str[0], 7);
 }
 
 void set_squelch(void){
 	char setup_str[7] = "J4100\r\n";
-	char v[2] = "  ";
-	itoa(int_rcvr_params.squelch_level, &v[0], 16);
-	memcpy(setup_str+3, v, 2);
+	int2strhex(int_rcvr_params.squelch_level, 2, &setup_str[3]);
 	send_command(&setup_str[0], 7);
 }
 
@@ -564,23 +563,23 @@ void tim3_isr(void)
 
 void send_command(char* cmd, uint8_t len){
 	if (int_rcvr_params.controlMode == CONTROL_MODE_STANDALONE){
-		usart_send_blocking(USART2, '>'); //DBG
+		//usart_send_blocking(USART2, '>'); //DBG
 		for (uint8_t i = 0; i < len; i++){
 			rb_u8_push(&rx_ring_buffer, (uint8_t)cmd[i]);
-                	usart_send_blocking(USART2, cmd[i]); //DBG
+                	//usart_send_blocking(USART2, cmd[i]); //DBG
 		}
+		usart_enable_tx_interrupt(USART1); // Immediate send command buffer
 	}
 }
 
 void usart1_isr(void){
 	uint8_t data = 0;
-	if (usart_get_flag(USART1, USART_SR_TXE)) {
-        gpio_toggle(GPIOE, GPIO8);
-		//usart_send_blocking(USART2, '>'); //DBG
+	if (rx_ring_buffer.length > 0) {
+		usart_send_blocking(USART2, '@'); //DBG
                 while(rb_u8_pop(&rx_ring_buffer, &data)){
 			host_cmd_parser(data);
                         usart_send_blocking(USART1, data);
-                        //usart_send_blocking(USART2, data); //DBG
+                        usart_send_blocking(USART2, data); //DBG
                 }
                 usart_disable_tx_interrupt(USART1);
                 
