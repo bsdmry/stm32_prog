@@ -8,7 +8,7 @@
 #include "usart.h"
 #include "usb_cdc.h"
 #include "i2c.h"
-#include "lcd1602_i2c.h"
+#include "winstar_lcd.h"
 #include "encoder.h"
 #include "cmd.h"
 
@@ -23,11 +23,14 @@ volatile uint8_t screen_update_flag = 0;
 uint8_t state_fsm = STATE_FSM_MAIN;
 uint8_t encoder_fsm = ENCODER_FSM_FREQ;
 volatile uint32_t last_encoder = 0; //encoder position for frequency
+
+winstar_lcd* lcd;
+
 char lcd_line1[17];
 char lcd_line2[17];
 
-Lcd1602_hbarline* volume_lvl;
-Lcd1602_hbarline* signal_lvl;
+winstar_hbarline* volume_lvl;
+winstar_hbarline* signal_lvl;
 
 uint8_t btn_mod_press = 0;
 uint8_t btn_a_press = 0;
@@ -104,22 +107,23 @@ int main(void)
 	rotary_encoder_tim3_set_value(0);	
 
 	i2c_1_1_setup();
-	lcd1602_init(I2C1);
-	lcd1602_set_custom_char(I2C1, 0, b1_chr);
-	lcd1602_set_custom_char(I2C1, 1, b2_chr);
-	lcd1602_set_custom_char(I2C1, 2, b3_chr);
-	lcd1602_set_custom_char(I2C1, 3, b4_chr);
-	lcd1602_set_custom_char(I2C1, 4, b5_chr);
-	lcd1602_set_custom_char(I2C1, 5, ant_chr);
-	lcd1602_set_custom_char(I2C1, 6, snd_chr);
+	lcd = winstar_init(WINSTAR_INTERFACE_I2C, I2C1, 0x3F );
+	lcd->backlight = 1;
+	winstar_set_custom_char(lcd, 0, b1_chr);
+	winstar_set_custom_char(lcd, 1, b2_chr);
+	winstar_set_custom_char(lcd, 2, b3_chr);
+	winstar_set_custom_char(lcd, 3, b4_chr);
+	winstar_set_custom_char(lcd, 4, b5_chr);
+	winstar_set_custom_char(lcd, 5, ant_chr);
+	winstar_set_custom_char(lcd, 6, snd_chr);
 	
-	volume_lvl = lcd1602_init_horizontal_barline(255, 3, ' ', "\x00\x01\x02\x03\x04");
-	signal_lvl = lcd1602_init_horizontal_barline(255, 7, ' ', "\x00\x01\x02\x03\x04");
+	volume_lvl = winstar_init_horizontal_barline(255, 3, ' ', "\x00\x01\x02\x03\x04");
+	signal_lvl = winstar_init_horizontal_barline(255, 7, '-', "\x00\x01\x02\x03\x04");
 
 	memset(lcd_line1, '-', 16);
 	memset(lcd_line2, '-', 16);
-	lcd1602_display(I2C1, lcd_line1, 1, 0);
-	lcd1602_display(I2C1, lcd_line2, 2, 0);
+	winstar_display(lcd, lcd_line1, 1, 0);
+	winstar_display(lcd, lcd_line2, 2, 0);
 
 
 
@@ -139,8 +143,8 @@ int main(void)
 				default: show_main_screen(); break;
 			}
 
-			lcd1602_display(I2C1, lcd_line1, 1, 0);
-			lcd1602_display(I2C1, lcd_line2, 2, 0);
+			winstar_display(lcd, lcd_line1, 1, 0);
+			winstar_display(lcd, lcd_line2, 2, 0);
 			screen_update_flag = 0;
 
 			
@@ -157,8 +161,8 @@ void setup_controls(void){
 }
 
 void show_main_screen(void){
-	lcd1602_set_horizontal_barline_value(volume_lvl, int_rcvr_params.volume);
-	lcd1602_set_horizontal_barline_value(signal_lvl, int_rcvr_params.signalLevel);
+	winstar_set_horizontal_barline_value(volume_lvl, int_rcvr_params.volume);
+	winstar_set_horizontal_barline_value(signal_lvl, int_rcvr_params.signalLevel);
 
 	memset(lcd_line1, '-', 16);
 	memset(lcd_line2, '-', 16);
