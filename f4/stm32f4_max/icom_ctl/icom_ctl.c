@@ -22,7 +22,7 @@ volatile uint8_t to_cdc_flag = 0;
 volatile uint8_t screen_update_flag = 0;
 uint8_t state_fsm = STATE_FSM_MAIN;
 uint8_t encoder_fsm = ENCODER_FSM_FREQ;
-uint32_t last_encoder = 0; //encoder position for frequency
+volatile uint32_t last_encoder = 0; //encoder position for frequency
 char lcd_line1[17];
 char lcd_line2[17];
 
@@ -61,24 +61,24 @@ static void clock_setup(void)
 	rcc_clock_setup_pll(&rcc_hse_25mhz_3v3[RCC_CLOCK_3V3_168MHZ]);
 	rcc_periph_clock_enable(RCC_GPIOA);
 	rcc_periph_clock_enable(RCC_GPIOE);
-	rcc_periph_clock_enable(RCC_TIM3);
+	rcc_periph_clock_enable(RCC_TIM4);
 }
 
-static void tim3_setup(void)
+static void tim4_setup(void)
 {
-        rcc_periph_reset_pulse(RST_TIM3);
-        timer_set_mode(TIM3, TIM_CR1_CKD_CK_INT, TIM_CR1_CMS_EDGE, TIM_CR1_DIR_UP);
+        rcc_periph_reset_pulse(RST_TIM4);
+        timer_set_mode(TIM4, TIM_CR1_CKD_CK_INT, TIM_CR1_CMS_EDGE, TIM_CR1_DIR_UP);
         uint32_t prescaler = 4200;
         uint32_t period = 2000;
-        timer_continuous_mode(TIM3);
-        timer_set_prescaler(TIM3, prescaler -1 );
-        timer_set_period(TIM3, period -1 );
-        timer_set_counter(TIM3,0);
+        timer_continuous_mode(TIM4);
+        timer_set_prescaler(TIM4, prescaler -1 );
+        timer_set_period(TIM4, period -1 );
+        timer_set_counter(TIM4,0);
         /* Counter enable. */
-        timer_enable_counter(TIM3);
-        timer_enable_irq(TIM3, TIM_DIER_UIE);
-        nvic_enable_irq(NVIC_TIM3_IRQ);
-	nvic_set_priority(NVIC_TIM3_IRQ, 5);
+        timer_enable_counter(TIM4);
+        timer_enable_irq(TIM4, TIM_DIER_UIE);
+        nvic_enable_irq(NVIC_TIM4_IRQ);
+	nvic_set_priority(NVIC_TIM4_IRQ, 5);
 }
 
 
@@ -87,10 +87,10 @@ int main(void)
 {
 	clock_setup();
 	dwt_setup();
-	gpio_mode_setup(GPIOE, GPIO_MODE_OUTPUT, GPIO_PUPD_NONE, GPIO8);
-        gpio_set(GPIOE, GPIO8);
+	//gpio_mode_setup(GPIOE, GPIO_MODE_OUTPUT, GPIO_PUPD_NONE, GPIO8);
+        //gpio_set(GPIOE, GPIO8);
 	init_usb_cdc(1);
-	tim3_setup();
+	tim4_setup();
 
 	setup_controls();
         usart_setup(USART1, 9600, 8, USART_STOPBITS_1, USART_MODE_TX_RX, USART_PARITY_NONE, USART_FLOWCONTROL_NONE );
@@ -100,8 +100,8 @@ int main(void)
 	usart_enable_rx_interrupt(USART1);
 	nvic_set_priority(NVIC_USART1_IRQ, 2);
 
-	rotary_encoder_tim1_setup(9);
-	rotary_encoder_tim1_set_value(0);	
+	rotary_encoder_tim3_setup(9);
+	rotary_encoder_tim3_set_value(0);	
 
 	i2c_1_1_setup();
 	lcd1602_init(I2C1);
@@ -120,6 +120,7 @@ int main(void)
 	memset(lcd_line2, '-', 16);
 	lcd1602_display(I2C1, lcd_line1, 1, 0);
 	lcd1602_display(I2C1, lcd_line2, 2, 0);
+
 
 
 	while(1){
@@ -141,6 +142,7 @@ int main(void)
 			lcd1602_display(I2C1, lcd_line1, 1, 0);
 			lcd1602_display(I2C1, lcd_line2, 2, 0);
 			screen_update_flag = 0;
+
 			
 		}
 		if (btn_mod_trg || btn_a_trg || btn_b_trg || btn_c_trg ){
@@ -265,7 +267,7 @@ void handle_encoder(void){
 		uint32_t cv = 0;
 		switch(encoder_fsm){
 			case ENCODER_FSM_FREQ:
-				cv = rotary_encoder_tim1_get_value();
+				cv = rotary_encoder_tim3_get_value();
 				int32_t delta = cv - last_encoder;
 				if (delta != 0){
 					if ((last_encoder == 9) && (cv == 0)){
@@ -273,32 +275,32 @@ void handle_encoder(void){
                                 	} else if ((last_encoder == 0) && (cv == 9)){
                                         	delta = -1;
                                 	}
-					dbg_transmit(last_encoder);
-					dbg_transmit(cv);
+					//dbg_transmit(last_encoder);
+					//dbg_transmit(cv);
 					int_rcvr_params.frequency = int_rcvr_params.frequency + (delta * int_rcvr_params.step);
-					dbg_transmit(int_rcvr_params.frequency);
+					//dbg_transmit(int_rcvr_params.frequency);
 					set_reciever_params(); 
 				}
 				last_encoder = cv;
 				break;
 
 			case ENCODER_FSM_VOL:
-				cv = rotary_encoder_tim1_get_value();
+				cv = rotary_encoder_tim3_get_value();
 				if ((int_rcvr_params.volume == 255) && (cv == 0)){
-					rotary_encoder_tim1_set_value(255);	
+					rotary_encoder_tim3_set_value(255);	
 				} else if ((int_rcvr_params.volume == 0) && (cv == 255)){
-					rotary_encoder_tim1_set_value(0);	
+					rotary_encoder_tim3_set_value(0);	
 				} else {
 					int_rcvr_params.volume = (uint8_t)cv;
 					set_volume();
 				}
 				break;
 			case ENCODER_FSM_SQL:
-				cv = rotary_encoder_tim1_get_value();
+				cv = rotary_encoder_tim3_get_value();
 				if ((int_rcvr_params.squelch_level == 255) && (cv == 0)){
-					rotary_encoder_tim1_set_value(255);	
+					rotary_encoder_tim3_set_value(255);	
 				} else if ((int_rcvr_params.squelch_level == 0) && (cv == 255)){
-					rotary_encoder_tim1_set_value(0);	
+					rotary_encoder_tim3_set_value(0);	
 				} else {
 					int_rcvr_params.squelch_level = (uint8_t)cv;
 					set_squelch();
@@ -328,9 +330,13 @@ void set_control_mode_standalone(void){
 	//	dwt_delay_ms(250);
 		send_command("G301\r\n", 6);	
 	}
+	dwt_delay_ms(50);
 	set_reciever_params(); 
+	dwt_delay_ms(50);
 	set_squelch();
+	dwt_delay_ms(50);
 	set_volume();
+	dwt_delay_ms(50);
 }
 
 void set_control_mode_bridge(void){
@@ -349,6 +355,8 @@ void set_control_mode_none(void){
 		send_command("G103\r\n", 6);
 		usart_disable(USART1);
 		usart_setup(USART1, 9600, 8, USART_STOPBITS_1, USART_MODE_TX_RX, USART_PARITY_NONE, USART_FLOWCONTROL_NONE );
+		nvic_enable_irq(NVIC_USART1_IRQ);
+		usart_enable_rx_interrupt(USART1);
 		dwt_delay_ms(250);
 		send_command("H100\r\n", 6);
 	}
@@ -429,21 +437,21 @@ void change_vol_sql_freq(void){
 		switch (encoder_fsm){
 			case ENCODER_FSM_FREQ:
 				encoder_fsm = ENCODER_FSM_VOL;
-				rotary_encoder_tim1_set_value(0);
-				rotary_encoder_tim1_set_limit(255);
-				rotary_encoder_tim1_set_value(int_rcvr_params.volume);	
+				rotary_encoder_tim3_set_value(0);
+				rotary_encoder_tim3_set_limit(255);
+				rotary_encoder_tim3_set_value(int_rcvr_params.volume);	
 				break;
 			case ENCODER_FSM_VOL:
 				encoder_fsm = ENCODER_FSM_SQL;
-				rotary_encoder_tim1_set_value(0);
-				rotary_encoder_tim1_set_limit(255);
-				rotary_encoder_tim1_set_value(int_rcvr_params.squelch_level);	
+				rotary_encoder_tim3_set_value(0);
+				rotary_encoder_tim3_set_limit(255);
+				rotary_encoder_tim3_set_value(int_rcvr_params.squelch_level);	
 				break;
 			case ENCODER_FSM_SQL:
 				encoder_fsm = ENCODER_FSM_FREQ;
-				rotary_encoder_tim1_set_value(0);
-				rotary_encoder_tim1_set_limit(9);
-				rotary_encoder_tim1_set_value(last_encoder);	
+				rotary_encoder_tim3_set_value(0);
+				rotary_encoder_tim3_set_limit(9);
+				rotary_encoder_tim3_set_value(last_encoder);	
 				break;
 			default: break;
 		}
@@ -551,13 +559,13 @@ void scan_buttons(void){
 	}
 }
 
-void tim3_isr(void)
+void tim4_isr(void)
 {
-        if (timer_interrupt_source(TIM3, TIM_SR_UIF)) {
+        if (timer_interrupt_source(TIM4, TIM_SR_UIF)) {
                 screen_update_flag = 1;
 		scan_buttons();
                 /* Clear compare interrupt flag. */
-                timer_clear_flag(TIM3, TIM_SR_UIF);
+                timer_clear_flag(TIM4, TIM_SR_UIF);
         }
 }
 

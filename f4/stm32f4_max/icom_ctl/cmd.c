@@ -1,8 +1,8 @@
 #include "cmd.h"
 #include "usart.h"
 #include <libopencm3/stm32/gpio.h>
-uint8_t cmd_parser_fsm = CMD_FSM_WAITING;
-uint8_t reply_parser_fsm = REPLY_FSM_WAITING;
+volatile uint8_t cmd_parser_fsm = CMD_FSM_WAITING;
+volatile uint8_t reply_parser_fsm = REPLY_FSM_WAITING;
 char freq_setup[FREQ_SETUP_STR_LENGHT];
 uint8_t freq_char_index = 0;
 
@@ -100,7 +100,7 @@ void parse_att_state(void){
 }
 
 void parse_rcvr_param_string(void){
-	if (int_rcvr_params.controlMode == CONTROL_MODE_BRIDGE){
+	//if (int_rcvr_params.controlMode == CONTROL_MODE_BRIDGE){
 		switch( ((uint8_t)rcvr_param_setup[0] ^ (uint8_t)rcvr_param_setup[1])  ){
 			case 0x04: parse_vol_level(); break;
 			case 0x05: parse_sq_level(); break;
@@ -110,13 +110,12 @@ void parse_rcvr_param_string(void){
 			case 0x03: parse_att_state(); break;
 			default: break;
 		}
-	}
+	//}
 }
 
 void parse_freq_string(uint8_t cmdLen){
-        gpio_toggle(GPIOE, GPIO8);
-	usart_send_string(USART2, freq_setup, FREQ_SETUP_STR_LENGHT);
-	usart_send_string(USART2, "=\n", 2);
+	//usart_send_string(USART2, freq_setup, FREQ_SETUP_STR_LENGHT);
+	//usart_send_string(USART2, "=\n", 2);
 	for(uint8_t f = 0; f < 10; f++){
 		char_freq_params.freq[f] = freq_setup[f+1];
 	}
@@ -211,6 +210,7 @@ void read_rcvr_param_setup(char s){
 		}
 
 	} else {
+		rcvr_param_char_index = 0; //Possible bug fix
 		handle_end_cmd();
 	}
 }
