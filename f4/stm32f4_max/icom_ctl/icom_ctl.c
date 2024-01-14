@@ -18,8 +18,12 @@
 #define BTN_B GPIO14
 #define BTN_C GPIO15
 
+#define BLINKER_DIV 4
+
 volatile uint8_t to_cdc_flag = 0;
 volatile uint8_t screen_update_flag = 0;
+volatile uint8_t screen_blinker_flag = 0;
+volatile uint8_t screen_blinker_div = BLINKER_DIV;
 uint8_t state_fsm = STATE_FSM_MAIN;
 uint8_t encoder_fsm = ENCODER_FSM_FREQ;
 volatile uint32_t last_encoder = 0; //encoder position for frequency
@@ -28,6 +32,8 @@ winstar_lcd* lcd;
 
 char lcd_line1[17];
 char lcd_line2[17];
+uint16_t lcd_line1_blink_bitmap = 0x0000;
+uint16_t lcd_line2_blink_bitmap = 0x0000;
 
 winstar_hbarline* volume_lvl;
 winstar_hbarline* signal_lvl;
@@ -142,7 +148,16 @@ int main(void)
 				case STATE_FSM_CONTROL_MODE: show_connection_screen(); break;
 				default: show_main_screen(); break;
 			}
-
+			if (screen_blinker_flag){
+				for (uint8_t p = 0; p < 16; p++){
+					if ((lcd_line1_blink_bitmap) & (uint16_t)(1 << p)){
+						lcd_line1[p] = ' ';
+					}
+					if ((lcd_line2_blink_bitmap) & (uint16_t)(1 << p)){
+						lcd_line2[p] = ' ';
+					}
+				}
+			}
 			winstar_display(lcd, lcd_line1, 1, 0);
 			winstar_display(lcd, lcd_line2, 2, 0);
 			screen_update_flag = 0;
@@ -168,7 +183,13 @@ void show_main_screen(void){
 	memset(lcd_line2, '-', 16);
 
 	memcpy(&lcd_line1, "\x05", 1);
-	memcpy(&lcd_line1[1], signal_lvl->bar_string, 7);
+	if (encoder_fsm == ENCODER_FSM_SQL){
+        	int2str((uint32_t)int_rcvr_params.signalLevel, 3, &lcd_line1[1]);
+		lcd_line1[4] = '|';
+        	int2str((uint32_t)int_rcvr_params.squelch_level, 3, &lcd_line1[5]);
+	} else {
+		memcpy(&lcd_line1[1], signal_lvl->bar_string, 7);
+	}
 	memcpy(&lcd_line1[8], "\x06", 1);
 	memcpy(&lcd_line1[9], volume_lvl->bar_string, 3);
 	memcpy(&lcd_line1[12], char_freq_params.filter, 4);
@@ -290,24 +311,28 @@ void handle_encoder(void){
 
 			case ENCODER_FSM_VOL:
 				cv = rotary_encoder_tim3_get_value();
-				if ((int_rcvr_params.volume == 255) && (cv == 0)){
-					rotary_encoder_tim3_set_value(255);	
-				} else if ((int_rcvr_params.volume == 0) && (cv == 255)){
-					rotary_encoder_tim3_set_value(0);	
-				} else {
-					int_rcvr_params.volume = (uint8_t)cv;
-					set_volume();
+				if (int_rcvr_params.volume != (uint8_t)cv){
+					if ((int_rcvr_params.volume == 255) && (cv == 0)){
+						rotary_encoder_tim3_set_value(255);	
+					} else if ((int_rcvr_params.volume == 0) && (cv == 255)){
+						rotary_encoder_tim3_set_value(0);	
+					} else {
+						int_rcvr_params.volume = (uint8_t)cv;
+						set_volume();
+					}
 				}
 				break;
 			case ENCODER_FSM_SQL:
 				cv = rotary_encoder_tim3_get_value();
-				if ((int_rcvr_params.squelch_level == 255) && (cv == 0)){
-					rotary_encoder_tim3_set_value(255);	
-				} else if ((int_rcvr_params.squelch_level == 0) && (cv == 255)){
-					rotary_encoder_tim3_set_value(0);	
-				} else {
-					int_rcvr_params.squelch_level = (uint8_t)cv;
-					set_squelch();
+				if (int_rcvr_params.squelch_level != (uint8_t)cv){
+					if ((int_rcvr_params.squelch_level == 255) && (cv == 0)){
+						rotary_encoder_tim3_set_value(255);	
+					} else if ((int_rcvr_params.squelch_level == 0) && (cv == 255)){
+						rotary_encoder_tim3_set_value(0);	
+					} else {
+						int_rcvr_params.squelch_level = (uint8_t)cv;
+						set_squelch();
+					}
 				}
 				break;
 			default: break;
@@ -444,18 +469,21 @@ void change_vol_sql_freq(void){
 				rotary_encoder_tim3_set_value(0);
 				rotary_encoder_tim3_set_limit(255);
 				rotary_encoder_tim3_set_value(int_rcvr_params.volume);	
+				lcd_line1_blink_bitmap = 0x0F00;
 				break;
 			case ENCODER_FSM_VOL:
 				encoder_fsm = ENCODER_FSM_SQL;
 				rotary_encoder_tim3_set_value(0);
 				rotary_encoder_tim3_set_limit(255);
 				rotary_encoder_tim3_set_value(int_rcvr_params.squelch_level);	
+				lcd_line1_blink_bitmap = 0x00FF;
 				break;
 			case ENCODER_FSM_SQL:
 				encoder_fsm = ENCODER_FSM_FREQ;
 				rotary_encoder_tim3_set_value(0);
 				rotary_encoder_tim3_set_limit(9);
 				rotary_encoder_tim3_set_value(last_encoder);	
+				lcd_line1_blink_bitmap = 0x0000;
 				break;
 			default: break;
 		}
@@ -568,6 +596,12 @@ void tim4_isr(void)
         if (timer_interrupt_source(TIM4, TIM_SR_UIF)) {
                 screen_update_flag = 1;
 		scan_buttons();
+		if (screen_blinker_div == 0){
+			screen_blinker_div = BLINKER_DIV;
+			screen_blinker_flag ^= 0x01;
+		} else {
+			screen_blinker_div--;
+		}
                 /* Clear compare interrupt flag. */
                 timer_clear_flag(TIM4, TIM_SR_UIF);
         }
