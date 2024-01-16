@@ -1,5 +1,6 @@
 void setup_controls(void);
 void handle_buttons(void);
+void step_change_freq(uint32_t current, uint32_t previous, uint32_t step_size);
 void handle_encoder(void);
 void show_main_screen(void);
 void show_reciever_options_screen(void);

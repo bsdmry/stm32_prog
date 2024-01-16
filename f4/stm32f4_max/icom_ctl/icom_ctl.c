@@ -18,6 +18,9 @@
 #define BTN_B GPIO14
 #define BTN_C GPIO15
 
+#define ROTBTN_PORT GPIOD
+#define ROTBTN GPIO15
+
 #define BLINKER_DIV 4
 
 volatile uint8_t to_cdc_flag = 0;
@@ -42,11 +45,13 @@ uint8_t btn_mod_press = 0;
 uint8_t btn_a_press = 0;
 uint8_t btn_b_press = 0;
 uint8_t btn_c_press = 0;
+uint8_t btn_rot_press = 0;
 
 uint8_t btn_mod_trg = 0;
 uint8_t btn_a_trg = 0;
 uint8_t btn_b_trg = 0;
 uint8_t btn_c_trg = 0;
+uint8_t btn_rot_trg = 0;
 
 uint8_t v1_chr[8] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x1F};
 uint8_t v2_chr[8] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x1F, 0x1F};
@@ -70,6 +75,7 @@ static void clock_setup(void)
 	rcc_clock_setup_pll(&rcc_hse_25mhz_3v3[RCC_CLOCK_3V3_168MHZ]);
 	rcc_periph_clock_enable(RCC_GPIOA);
 	rcc_periph_clock_enable(RCC_GPIOE);
+	rcc_periph_clock_enable(RCC_GPIOD);
 	rcc_periph_clock_enable(RCC_TIM4);
 }
 
@@ -164,7 +170,7 @@ int main(void)
 
 			
 		}
-		if (btn_mod_trg || btn_a_trg || btn_b_trg || btn_c_trg ){
+		if (btn_mod_trg || btn_a_trg || btn_b_trg || btn_c_trg  || btn_rot_trg){
 			handle_buttons();
 		}
 			handle_encoder();
@@ -173,6 +179,7 @@ int main(void)
 
 void setup_controls(void){
 	gpio_mode_setup(BTN_PORT, GPIO_MODE_INPUT, GPIO_PUPD_PULLUP , BTN_MOD | BTN_A | BTN_B | BTN_C);
+	gpio_mode_setup(ROTBTN_PORT, GPIO_MODE_INPUT, GPIO_PUPD_PULLUP , ROTBTN);
 }
 
 void show_main_screen(void){
@@ -270,6 +277,29 @@ void handle_buttons(void){
 		}
 		btn_c_trg = 0;
 	}
+	if (btn_rot_trg){
+		if (state_fsm == STATE_FSM_MAIN){
+			switch(encoder_fsm){
+				case ENCODER_FSM_FREQ: encoder_fsm = ENCODER_FSM_FREQ_HZ; 
+						       lcd_line2_blink_bitmap = 0x0E00;
+						       break;
+				case ENCODER_FSM_FREQ_HZ: encoder_fsm = ENCODER_FSM_FREQ_KHZ; 
+						       lcd_line2_blink_bitmap = 0x00E0;
+						       break;
+				case ENCODER_FSM_FREQ_KHZ: encoder_fsm = ENCODER_FSM_FREQ_MHZ; 
+						       lcd_line2_blink_bitmap = 0x000E;
+						       break;
+				case ENCODER_FSM_FREQ_MHZ: encoder_fsm = ENCODER_FSM_FREQ_GHZ; 
+						       lcd_line2_blink_bitmap = 0x0001;
+						       break;
+				case ENCODER_FSM_FREQ_GHZ: encoder_fsm = ENCODER_FSM_FREQ; 
+						       lcd_line2_blink_bitmap = 0x0000;
+						       break;
+				default: break;
+			}
+		}
+		btn_rot_trg = 0;
+	}
 }
 
 static void dbg_transmit(uint32_t number){
@@ -286,6 +316,26 @@ static void dbg_transmit(uint32_t number){
         usart_send_blocking(USART2, 0x0A);
 }
 
+void step_change_freq(uint32_t current, uint32_t previous, uint32_t step_size){
+	int32_t delta = current - previous;
+	if (delta != 0){
+		if ((previous == 9) && (current == 0)){
+			delta = 1;
+                } else if ((previous == 0) && (current == 9)){
+                        delta = -1;
+                }
+		//dbg_transmit(previous);
+		//dbg_transmit(current);
+		int_rcvr_params.frequency = int_rcvr_params.frequency + (delta * step_size);
+		if (int_rcvr_params.frequency < 10000){
+			int_rcvr_params.frequency = 10000;
+		}else if (int_rcvr_params.frequency > 1300000000){
+			int_rcvr_params.frequency = 1300000000;
+		}
+		//dbg_transmit(int_rcvr_params.frequency);
+		set_reciever_params(); 
+	}
+}
 
 void handle_encoder(void){
 	if (int_rcvr_params.controlMode == CONTROL_MODE_STANDALONE){
@@ -293,19 +343,27 @@ void handle_encoder(void){
 		switch(encoder_fsm){
 			case ENCODER_FSM_FREQ:
 				cv = rotary_encoder_tim3_get_value();
-				int32_t delta = cv - last_encoder;
-				if (delta != 0){
-					if ((last_encoder == 9) && (cv == 0)){
-                                        	delta = 1;
-                                	} else if ((last_encoder == 0) && (cv == 9)){
-                                        	delta = -1;
-                                	}
-					//dbg_transmit(last_encoder);
-					//dbg_transmit(cv);
-					int_rcvr_params.frequency = int_rcvr_params.frequency + (delta * int_rcvr_params.step);
-					//dbg_transmit(int_rcvr_params.frequency);
-					set_reciever_params(); 
-				}
+				step_change_freq(cv, last_encoder, int_rcvr_params.step);
+				last_encoder = cv;
+				break;
+			case ENCODER_FSM_FREQ_HZ:
+				cv = rotary_encoder_tim3_get_value();
+				step_change_freq(cv, last_encoder, 1);
+				last_encoder = cv;
+				break;
+			case ENCODER_FSM_FREQ_KHZ:
+				cv = rotary_encoder_tim3_get_value();
+				step_change_freq(cv, last_encoder, 1000);
+				last_encoder = cv;
+				break;
+			case ENCODER_FSM_FREQ_MHZ:
+				cv = rotary_encoder_tim3_get_value();
+				step_change_freq(cv, last_encoder, 1000000);
+				last_encoder = cv;
+				break;
+			case ENCODER_FSM_FREQ_GHZ:
+				cv = rotary_encoder_tim3_get_value();
+				step_change_freq(cv, last_encoder, 1000000000);
 				last_encoder = cv;
 				break;
 
@@ -587,6 +645,14 @@ void scan_buttons(void){
 		if(btn_c_press){
 			btn_c_trg = 1;
 			btn_c_press = 0;
+		}
+	}
+	if(!gpio_get(ROTBTN_PORT, ROTBTN)){
+		btn_rot_press = 1;
+	} else {
+		if(btn_rot_press){
+			btn_rot_trg = 1;
+			btn_rot_press = 0;
 		}
 	}
 }
