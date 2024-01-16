@@ -152,6 +152,7 @@ int main(void)
 				case STATE_FSM_MAIN: show_main_screen(); break;
 				case STATE_FSM_RECIVER_OPTIONS: show_reciever_options_screen(); break;
 				case STATE_FSM_CONTROL_MODE: show_connection_screen(); break;
+				case STATE_FSM_STEP_CFG: show_step_size_screen(); break;
 				default: show_main_screen(); break;
 			}
 			if (screen_blinker_flag){
@@ -240,12 +241,29 @@ void show_connection_screen(void){
 	}
 }
 
+void show_step_size_screen(void){
+	memcpy(lcd_line1, "   Step  size   ", 16);
+	switch (int_rcvr_params.stepId){
+		case STEP_ID_1HZ:      memcpy(lcd_line2, "      1 Hz      ", 16); break;
+		case STEP_ID_10HZ:     memcpy(lcd_line2, "     10 Hz      ", 16); break;
+		case STEP_ID_100HZ:    memcpy(lcd_line2, "    100 Hz      ", 16); break;
+		case STEP_ID_1KHZ:     memcpy(lcd_line2, "      1 KHz     ", 16); break;
+		case STEP_ID_3KHZ:     memcpy(lcd_line2, "      3 KHz     ", 16); break;
+		case STEP_ID_12d5KHZ:  memcpy(lcd_line2, "   12.5 KHz     ", 16); break;
+		case STEP_ID_25KHZ:    memcpy(lcd_line2, "     25 KHz     ", 16); break;
+		case STEP_ID_100KHZ:   memcpy(lcd_line2, "    100 KHz     ", 16); break;
+		case STEP_ID_1MHZ:     memcpy(lcd_line2, "      1 Mhz     ", 16); break;
+		default:  memcpy(lcd_line2, "                ", 16); break;
+	}
+}
+
 void handle_buttons(void){
 	if (btn_mod_trg){
 		switch(state_fsm){
 			case STATE_FSM_MAIN: state_fsm = STATE_FSM_RECIVER_OPTIONS; break;
 			case STATE_FSM_RECIVER_OPTIONS: state_fsm = STATE_FSM_CONTROL_MODE; break;
-			case STATE_FSM_CONTROL_MODE: state_fsm = STATE_FSM_MAIN; break;
+			case STATE_FSM_CONTROL_MODE: state_fsm = STATE_FSM_STEP_CFG; break;
+			case STATE_FSM_STEP_CFG: state_fsm = STATE_FSM_MAIN; break;
 			default: state_fsm = STATE_FSM_MAIN; break;
 		}
 		btn_mod_trg = 0;
@@ -264,6 +282,7 @@ void handle_buttons(void){
 			case STATE_FSM_MAIN: change_filter(); break;
 			case STATE_FSM_RECIVER_OPTIONS: switch_att(); break;
 			case STATE_FSM_CONTROL_MODE: set_control_mode_standalone(); break;
+			case STATE_FSM_STEP_CFG: switch_step(); break;
 			default: break;
 		}
 		btn_b_trg = 0;
@@ -611,6 +630,21 @@ void switch_nb(void){
 		send_command("J4601\r\n",7);
 	} else {
 		send_command("J4600\r\n",7);
+	}
+}
+
+void switch_step(void){
+	switch(int_rcvr_params.stepId) {
+		case STEP_ID_1HZ: int_rcvr_params.stepId = STEP_ID_10HZ; int_rcvr_params.step = 10; break;	
+		case STEP_ID_10HZ: int_rcvr_params.stepId = STEP_ID_100HZ; int_rcvr_params.step = 100; break;	
+		case STEP_ID_100HZ: int_rcvr_params.stepId = STEP_ID_1KHZ; int_rcvr_params.step = 1000; break;	
+		case STEP_ID_1KHZ: int_rcvr_params.stepId = STEP_ID_3KHZ; int_rcvr_params.step = 3000; break;	
+		case STEP_ID_3KHZ: int_rcvr_params.stepId = STEP_ID_12d5KHZ; int_rcvr_params.step = 12500; break;	
+		case STEP_ID_12d5KHZ: int_rcvr_params.stepId = STEP_ID_25KHZ; int_rcvr_params.step = 25000; break;	
+		case STEP_ID_25KHZ: int_rcvr_params.stepId = STEP_ID_100KHZ; int_rcvr_params.step = 100000; break;	
+		case STEP_ID_100KHZ: int_rcvr_params.stepId = STEP_ID_1MHZ; int_rcvr_params.step = 1000000; break;	
+		case STEP_ID_1MHZ: int_rcvr_params.stepId = STEP_ID_1HZ; int_rcvr_params.step = 1; break;
+		default: int_rcvr_params.stepId = STEP_ID_1HZ; int_rcvr_params.step = 1; break;	   
 	}
 }
 

@@ -29,7 +29,8 @@ RecieverParams int_rcvr_params = {
 	.frequency = 1000000,
 	.modulation = 3,
 	.filter = 0,
-	.step = 1000
+	.step = 1000,
+	.stepId = STEP_ID_1KHZ
 };
 
 char rcvr_param_setup[RCVR_PARAM_SETUP_STR_LENGHT];

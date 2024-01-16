@@ -12,6 +12,7 @@
 #define STATE_FSM_MAIN 0
 #define STATE_FSM_RECIVER_OPTIONS 1
 #define STATE_FSM_CONTROL_MODE 2
+#define STATE_FSM_STEP_CFG 3
 
 #define ENCODER_FSM_FREQ 0
 #define ENCODER_FSM_VOL 1
@@ -33,6 +34,15 @@
 #define CONTROL_MODE_STANDALONE 1
 #define CONTROL_MODE_BRIDGE 2
 
+#define STEP_ID_1HZ 0
+#define STEP_ID_10HZ 1
+#define STEP_ID_100HZ 2
+#define STEP_ID_1KHZ 3
+#define STEP_ID_3KHZ 4
+#define STEP_ID_12d5KHZ 5
+#define STEP_ID_25KHZ 6
+#define STEP_ID_100KHZ 7
+#define STEP_ID_1MHZ 8
 
 typedef struct {
 	char freq[10];
@@ -58,6 +68,7 @@ typedef struct {
 	uint8_t modulation;
 	uint8_t filter;
 	uint32_t step;
+	uint32_t stepId;
 } RecieverParams;
 
 void detect_start_cmd(char s);
