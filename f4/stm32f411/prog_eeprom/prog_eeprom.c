@@ -5,27 +5,7 @@
 #include "usb_cdc.h"
 #include "prog_eeprom.h"
 
-// PA0-PA7 - data
-// PB12 - ADDR0
-// PB13 - ADDR1
-// PB14 - ADDR2
-// PB15 - ADDR3
-// PA8 - ADDR4
-// PA9 - ADDR5
-// PA10 - ADDR6
-// PA15 - ADDR7
-// PB3 - ADDR8
-// PB4 - ADDR9
-// PB5 - ADDR10
-// PB6 - ADDR11
-// PB7 - ADDR12
-// PB8 - ADDR13
-// PB9 - ADDR14
-// PB10 - ADDR15
-
-//READ - PB1
-//WRITE -PB0
-
+#define DATA_PORT GPIOA
 #define DATA0 GPIO0
 #define DATA1 GPIO1
 #define DATA2 GPIO2
@@ -52,32 +32,37 @@
 #define ADDR14 GPIO9
 #define ADDR15 GPIO10
 
+#define RW_PORT GPIOB
 #define READ GPIO1
 #define WRITE GPIO0
 
 #define MODE_READ 0
 #define MODE_WRITE 1
 
+#define RW_CMD_READ 0
+#define RW_CMD_WRITE 1
+#define RW_CMD_IDLE 2
+
 uint32_t const addr_port[16] = {
-								GPIOB, GPIOB, GPIOB, GPIOB,
-								GPIOA, GPIOA, GPIOA, GPIOA,
-								GPIOB, GPIOB, GPIOB, GPIOB,
-								GPIOB, GPIOB, GPIOB, GPIOB
+								GPIOB, GPIOB, GPIOB, GPIOB,			// GPIO12, GPIO13, GPIO14, GPIO15
+								GPIOA, GPIOA, GPIOA, GPIOA,			// GPIO8,  GPIO9,  GPIO10, GPIO15
+								GPIOB, GPIOB, GPIOB, GPIOB,			// GPIO3,  GPIO4,  GPIO5,  GPIO6,
+								GPIOB, GPIOB, GPIOB, GPIOB			// GPIO7,  GPIO8,  GPIO9,  GPIO10
 								};
 uint16_t const addr_pin[16] = {
-								ADDR0, ADDR1, ADDR2, ADDR3,
-								ADDR4, ADDR5, ADDR6, ADDR7,
-								ADDR8, ADDR9, ADDR10, ADDR11,
-								ADDR12, ADDR13, ADDR14, ADDR15,	
+								ADDR0, ADDR1, ADDR2, ADDR3,			// GPIO12, GPIO13, GPIO14, GPIO15
+								ADDR4, ADDR5, ADDR6, ADDR7,			// GPIO8,  GPIO9,  GPIO10, GPIO15
+								ADDR8, ADDR9, ADDR10, ADDR11,		// GPIO3,  GPIO4,  GPIO5,  GPIO6,
+								ADDR12, ADDR13, ADDR14, ADDR15,		// GPIO7,  GPIO8,  GPIO9,  GPIO10
 								};
 uint16_t const data_pin[8] = {
-								DATA0, DATA1, DATA2, DATA3,
-								DATA4, DATA5, DATA6, DATA7
+								DATA0, DATA1, DATA2, DATA3,			// GPIO0,  GPIO1,  GPIO2,  GPIO3,
+								DATA4, DATA5, DATA6, DATA7			// GPIO4,  GPIO5,  GPIO6,  GPIO7
 								};
 
-uint8_t data_bus_mode = MODE_WRITE;
-uint8_t address_bus_mode = MODE_WRITE;
-uint8_t rw_pins_mode = MODE_WRITE;
+uint8_t data_bus_mode = MODE_READ;
+uint8_t address_bus_mode = MODE_READ;
+uint8_t rw_pins_mode = MODE_READ;
 volatile uint8_t buf_show = 0;	
 char inputcmd[5];
 
@@ -112,11 +97,11 @@ static void tim3_setup(void)
 
 void set_data_bus_read_mode(void){
 	data_bus_mode = MODE_READ;
-	gpio_mode_setup(GPIOA, GPIO_MODE_INPUT, GPIO_PUPD_NONE, DATA0 | DATA1 | DATA2 | DATA3 | DATA4 | DATA5 | DATA6 | DATA7);
+	gpio_mode_setup(DATA_PORT, GPIO_MODE_INPUT, GPIO_PUPD_NONE, DATA0 | DATA1 | DATA2 | DATA3 | DATA4 | DATA5 | DATA6 | DATA7);
 }
 void set_data_bus_write_mode(void){
 	data_bus_mode = MODE_WRITE;
-	gpio_mode_setup(GPIOA, GPIO_MODE_OUTPUT, GPIO_PUPD_NONE, DATA0 | DATA1 | DATA2 | DATA3 | DATA4 | DATA5 | DATA6 | DATA7);
+	gpio_mode_setup(DATA_PORT, GPIO_MODE_OUTPUT, GPIO_PUPD_NONE, DATA0 | DATA1 | DATA2 | DATA3 | DATA4 | DATA5 | DATA6 | DATA7);
 }
 
 void set_address_bus_read_mode(void){
@@ -133,12 +118,12 @@ void set_address_bus_write_mode(void){
 
 void set_rw_pins_write_mode(void){
 	rw_pins_mode = MODE_WRITE;
-	gpio_mode_setup(GPIOB, GPIO_MODE_OUTPUT, GPIO_PUPD_NONE, READ | WRITE); 
+	gpio_mode_setup(RW_PORT, GPIO_MODE_OUTPUT, GPIO_PUPD_NONE, READ | WRITE); 
 }
 
 void set_rw_pins_read_mode(void){
 	rw_pins_mode = MODE_READ;
-	gpio_mode_setup(GPIOB, GPIO_MODE_INPUT, GPIO_PUPD_NONE, READ | WRITE); 
+	gpio_mode_setup(RW_PORT, GPIO_MODE_INPUT, GPIO_PUPD_NONE, READ | WRITE); 
 }
 
 void set_address(uint16_t address){
@@ -175,12 +160,13 @@ void set_data(uint8_t data){
 	}
 	for (uint8_t i = 0; i < 8; i++){
 		if (data & (0x01 << i)){
-			gpio_set(GPIOA, data_pin[i]);
+			gpio_set(DATA_PORT, data_pin[i]);
 		} else {
-			gpio_clear(GPIOA, data_pin[i]);
+			gpio_clear(DATA_PORT, data_pin[i]);
 		}
 	}	
 }
+
 
 uint8_t get_data(void){
 	if (data_bus_mode != MODE_READ){
@@ -188,7 +174,7 @@ uint8_t get_data(void){
 	}
 	uint8_t val = 0;
 	for (uint8_t i = 0; i < 7; i++){
-		if (gpio_get(GPIOA, data_pin[i]) != 0x00){
+		if (gpio_get(DATA_PORT, data_pin[i]) != 0x00){
 			val |= (0x01 << i);
 		} else {
 			val &= ~(0x01 << i);
@@ -197,7 +183,60 @@ uint8_t get_data(void){
 	return val;
 }
 
+void set_rw(uint8_t rw_mode){
+	if (rw_pins_mode != MODE_WRITE){
+		set_rw_pins_write_mode();
+	}
+	if (rw_mode == RW_CMD_READ){ // Pin /RD low, active
+		gpio_clear(RW_PORT, READ);
+		gpio_set(RW_PORT, WRITE);
+	} else if(rw_mode == RW_CMD_WRITE){ //Pin /WR low, active
+		gpio_set(RW_PORT, READ);
+		gpio_clear(RW_PORT, WRITE);
+	} else { // Both are high - Idle
+		gpio_set(RW_PORT, READ);
+		gpio_set(RW_PORT, WRITE);
+	}
+}
 
+uint8_t get_rw(void){
+	if (rw_pins_mode != MODE_READ){
+		set_rw_pins_read_mode();
+	}	
+	uint8_t status = 0x00;
+	if (gpio_get(RW_PORT, WRITE) != 0x00){
+		status = 0x01;
+	}
+	status = status << 1;
+	if (gpio_get(RW_PORT, READ) != 0x00){
+		status |= 0x01;
+	}
+	return status;
+}
+
+void eeprom_write(uint16_t address, uint8_t data){
+	set_rw(RW_CMD_IDLE);
+	set_address(address);
+	set_data(data);
+	set_rw(RW_CMD_WRITE);
+	for(uint16_t i = 0; i < 100; i++){
+		__asm("nop");
+	}
+	set_rw(RW_CMD_IDLE);
+}
+
+uint8_t eeprom_read(uint16_t address){
+	set_rw(RW_CMD_IDLE);
+	uint8_t data = 0x00;
+	set_address(address);
+	set_rw(RW_CMD_WRITE);
+	for(uint16_t i = 0; i < 100; i++){
+		__asm("nop");
+	}
+	data = get_data();
+	set_rw(RW_CMD_IDLE);
+	return data;
+}
 
 void get_cdc_comm_config(uint32_t speed, uint8_t stop_bits, uint8_t parity, uint8_t data_bits){
 
@@ -237,15 +276,19 @@ void val2hexstr(uint32_t val, char* str, uint8_t len){
 
 void parse_cmd(void){
 	uint8_t reply[5] =  {0x3E, inputcmd[1], inputcmd[2], 0x01, 0x0A};
+	uint16_t address = 0x0000;;
+	
 	if (inputcmd[0] == 0x57){ //'W' - write
-		uint16_t address = (((uint16_t)inputcmd[1] << 8) | (uint16_t)inputcmd[2]);
+		address = (((uint16_t)inputcmd[1] << 8) | (uint16_t)inputcmd[2]);
 		uint8_t data = (uint8_t)inputcmd[3];
-		set_address(address);
-		set_data(data);
-		cdc_send(&reply[0], 5);
-	} else if {
-
+		eeprom_write(address, data);
+	} else if (inputcmd[0] == 0x52){ //'R'
+		address = (((uint16_t)inputcmd[1] << 8) | (uint16_t)inputcmd[2]);
+		reply[3] = eeprom_read(address);
+	} else {
+		reply[0] = 0x3F;  //send '?'
 	}
+	cdc_send(&reply[0], 5);
 }
 
 int main(void)
@@ -256,26 +299,16 @@ int main(void)
 	tim3_setup();
 	gpio_mode_setup(GPIOC, GPIO_MODE_OUTPUT, GPIO_PUPD_NONE, GPIO13);
 	gpio_clear(GPIOC, GPIO13);
-	uint8_t dat = 0xAA;
-	uint16_t add = 0xDEAD;
-	char output[20] = "A: 0xFFFF D: OxFF \r\n"; //"A: 0xFFFF D: OxFF\r\n"
-	char buflen[11] = "BUF 0x00 \r\n";
-	val2hexstr((uint32_t)add, &output[5], 4);
-	val2hexstr((uint32_t)dat, &output[15], 2);
-	set_data_bus_write_mode();
-	set_address_bus_write_mode();
-	set_rw_pins_read_mode();
+	//val2hexstr((uint32_t)add, &output[5], 4);
+	//val2hexstr((uint32_t)dat, &output[15], 2);
+	set_data_bus_read_mode();
+	set_address_bus_read_mode();
+	set_rw(RW_CMD_IDLE);
 	
 
 	while(1){
 		cdcacm_data_tx(usbd_dev_g);
 		if(rx_ring_buffer.length > 0){
-			//gpio_toggle(GPIOC, GPIO13);
-
-		//	val2hexstr((uint32_t)rx_ring_buffer.length, &buflen[6], 2);
-		//	cdc_send(&buflen[0], 11);
-			//cdcacm_data_tx(usbd_dev_g);
-
 			for (uint8_t i = 0; i < MAX_PACKET_SIZE; i++){
 					uint8_t res = rb_u8_pop(&rx_ring_buffer, &inputcmd[i]);
 					if (inputcmd[i] == 0x0A) {
@@ -286,15 +319,6 @@ int main(void)
 					}
 			}			
 		}
-		//dwt_delay_ms(1000);
-		//dat = get_data();
-		//add = get_address();
-		//val2hexstr((uint32_t)add, &output[5], 4);
-		//set_data(dat);
-		//val2hexstr((uint32_t)dat, &output[15], 2);
-		//cdc_print(&output[0]);
-		//cdcacm_data_tx(usbd_dev_g);
-		
 	};
 }
 
