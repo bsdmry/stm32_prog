@@ -36,8 +36,17 @@
 #define READ GPIO1
 #define WRITE GPIO0
 
+#define OE_PORT GPIOC
+#define OE GPIO15
+
+#define CE_PORT GPIOC
+#define CE GPIO14
+
 #define MODE_READ 0
 #define MODE_WRITE 1
+
+#define PIN_LOW 0
+#define PIN_HIGH 1
 
 #define RW_CMD_READ 0
 #define RW_CMD_WRITE 1
@@ -126,6 +135,15 @@ void set_rw_pins_read_mode(void){
 	gpio_mode_setup(RW_PORT, GPIO_MODE_INPUT, GPIO_PUPD_NONE, READ | WRITE); 
 }
 
+void set_oe_pin_write_mode(void){
+	gpio_mode_setup(OE_PORT, GPIO_MODE_OUTPUT, GPIO_PUPD_NONE, OE); 
+}
+
+void set_ce_pin_write_mode(void){
+	gpio_mode_setup(CE_PORT, GPIO_MODE_OUTPUT, GPIO_PUPD_NONE, CE); 
+}
+
+
 void set_address(uint16_t address){
 	if (address_bus_mode != MODE_WRITE){
 		set_address_bus_write_mode();
@@ -173,7 +191,7 @@ uint8_t get_data(void){
 		set_data_bus_read_mode();
 	}
 	uint8_t val = 0;
-	for (uint8_t i = 0; i < 7; i++){
+	for (uint8_t i = 0; i < 8; i++){
 		if (gpio_get(DATA_PORT, data_pin[i]) != 0x00){
 			val |= (0x01 << i);
 		} else {
@@ -214,26 +232,51 @@ uint8_t get_rw(void){
 	return status;
 }
 
+void set_oe(uint8_t rw_mode){
+	if (rw_mode == PIN_HIGH){ // Pin /OE high,
+		gpio_set(OE_PORT, OE);
+	}else{
+		gpio_clear(OE_PORT, OE); //All others - /OE low, active (read and idle)
+	}		
+}
+
+void set_ce(uint8_t rw_mode){
+	if (rw_mode == PIN_HIGH){ // Pin /CE high,
+		gpio_set(CE_PORT, CE);
+	}else{
+		gpio_clear(CE_PORT, CE); //All others - /CE low, active (read and idle)
+	}		
+}
+
 void eeprom_write(uint16_t address, uint8_t data){
-	set_rw(RW_CMD_IDLE);
+	set_rw(RW_CMD_IDLE); //Write High, Read High
+
+	set_oe(PIN_HIGH); //OE high
 	set_address(address);
-	set_data(data);
-	set_rw(RW_CMD_WRITE);
+	set_ce(PIN_LOW);
+	set_rw(RW_CMD_WRITE); // /WR low
 	for(uint16_t i = 0; i < 100; i++){
 		__asm("nop");
 	}
-	set_rw(RW_CMD_IDLE);
+	set_data(data);
+	set_rw(RW_CMD_IDLE); // /WR high 
+	set_ce(PIN_HIGH);
+	set_oe(PIN_LOW);
 }
 
 uint8_t eeprom_read(uint16_t address){
 	set_rw(RW_CMD_IDLE);
 	uint8_t data = 0x00;
 	set_address(address);
-	set_rw(RW_CMD_WRITE);
+	set_rw(RW_CMD_READ);
+	set_ce(PIN_LOW);
+	set_oe(PIN_LOW);
 	for(uint16_t i = 0; i < 100; i++){
 		__asm("nop");
 	}
 	data = get_data();
+	set_ce(PIN_HIGH);
+	set_oe(PIN_HIGH);
 	set_rw(RW_CMD_IDLE);
 	return data;
 }
@@ -276,7 +319,7 @@ void val2hexstr(uint32_t val, char* str, uint8_t len){
 
 void parse_cmd(void){
 	uint8_t reply[5] =  {0x3E, inputcmd[1], inputcmd[2], 0x01, 0x0A};
-	uint16_t address = 0x0000;;
+	uint16_t address = 0x0000;
 	
 	if (inputcmd[0] == 0x57){ //'W' - write
 		address = (((uint16_t)inputcmd[1] << 8) | (uint16_t)inputcmd[2]);
@@ -288,6 +331,10 @@ void parse_cmd(void){
 	} else {
 		reply[0] = 0x3F;  //send '?'
 	}
+	//char txt[] = ">0x0000 - 0x00\n";
+	//val2hexstr((uint32_t)address, &txt[3], 4);
+	//val2hexstr((uint32_t)reply[3], &txt[12], 2);
+	//cdc_print(&txt[0]);
 	cdc_send(&reply[0], 5);
 }
 
@@ -304,6 +351,10 @@ int main(void)
 	set_data_bus_read_mode();
 	set_address_bus_read_mode();
 	set_rw(RW_CMD_IDLE);
+	set_oe_pin_write_mode();
+	set_ce_pin_write_mode();
+	set_oe(PIN_HIGH);
+	set_ce(PIN_HIGH);
 	
 
 	while(1){
@@ -311,7 +362,7 @@ int main(void)
 		if(rx_ring_buffer.length > 0){
 			for (uint8_t i = 0; i < MAX_PACKET_SIZE; i++){
 					uint8_t res = rb_u8_pop(&rx_ring_buffer, &inputcmd[i]);
-					if (inputcmd[i] == 0x0A) {
+					if ((inputcmd[i] == 0x0A) && (i == 0x04)) {
 						parse_cmd();
 					}
 					if (res == 0){
